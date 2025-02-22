@@ -1,5 +1,8 @@
+use core::f32;
+
 use bevy::prelude::*;
 use bevy_mod_imgui::prelude::*;
+use rand::Rng;
 
 const BOUNDS: Vec2 = Vec2::new(1920.0, 1080.0);
 
@@ -9,17 +12,11 @@ struct ImguiState {
 }
 
 #[derive(Component)]
-struct Player {
-    movement_speed: f32,
-    rotation_speed: f32,
-}
-
-#[derive(Component)]
-struct SnapToPlayer;
-
-#[derive(Component)]
-struct RotateToPlayer {
-    rotation_speed: f32,
+struct Boid {
+    separation_vel: Vec2,
+    alignment_vel: Vec2,
+    cohesion_vel: Vec2,
+    rotation: f32,
 }
 
 fn main() {
@@ -42,62 +39,96 @@ fn main() {
         .insert_resource(ImguiState {
             demo_window_open: true,
         })
-        .add_systems(Startup, setup)
-        .add_systems(
+        .add_systems(Startup, (setup).chain())
+        /* .add_systems(
             FixedUpdate,
             (
                 player_movement_system,
                 snap2player_system,
                 rotate2player_system,
             ),
-        )
+        ) */
         .add_systems(PostUpdate, imgui_example_ui)
         .run();
 }
 
 fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
-    let ship_handle =
+    let boid_handle =
         asset_server.load("/home/agrg11/Documentos/uni/tfg/motor-fisicas/assets/textures/ship.png");
-    let enemy_handle = asset_server
-        .load("/home/agrg11/Documentos/uni/tfg/motor-fisicas/assets/textures/enemy.png");
 
     commands.spawn(Camera2d);
 
-    let horizontal_margin = BOUNDS.x / 4.0;
-    let vertical_margin = BOUNDS.y / 4.0;
+    spawn_boids(&mut commands, &boid_handle);
 
-    commands.spawn((
-        Sprite::from_image(ship_handle),
-        Player {
-            movement_speed: 500.0,
-            rotation_speed: f32::to_radians(360.0),
-        },
-    ));
+    // commands.spawn((
+    //     Sprite::from_image(boid_handle),
+    //     Boid {
+    //         separation_vel: Vec2::new(0.0, 1.0),
+    //         alignment_vel: Vec2::new(0.0, 1.0),
+    //         cohesion_vel: Vec2::new(0.0, 1.0),
+    //         rotation: 0.0,
+    //     },
+    // ));
 
-    commands.spawn((
-        Sprite::from_image(enemy_handle.clone()),
-        Transform::from_xyz(0.0 - horizontal_margin, 0.0, 0.0),
-        SnapToPlayer,
-    ));
-    commands.spawn((
-        Sprite::from_image(enemy_handle.clone()),
-        Transform::from_xyz(0.0, 0.0 - vertical_margin, 0.0),
-        SnapToPlayer,
-    ));
-    commands.spawn((
-        Sprite::from_image(enemy_handle.clone()),
-        Transform::from_xyz(0.0 + horizontal_margin, 0.0, 0.0),
-        RotateToPlayer {
-            rotation_speed: f32::to_radians(45.0),
-        },
-    ));
-    commands.spawn((
-        Sprite::from_image(enemy_handle),
-        Transform::from_xyz(0.0, 0.0 + vertical_margin, 0.0),
-        RotateToPlayer {
-            rotation_speed: f32::to_radians(90.0),
-        },
-    ));
+    // let ship_handle =
+    //     asset_server.load("/home/agrg11/Documentos/uni/tfg/motor-fisicas/assets/textures/ship.png");
+    // let enemy_handle = asset_server
+    //     .load("/home/agrg11/Documentos/uni/tfg/motor-fisicas/assets/textures/enemy.png");
+    //
+    // commands.spawn(Camera2d);
+    //
+    // let horizontal_margin = BOUNDS.x / 4.0;
+    // let vertical_margin = BOUNDS.y / 4.0;
+    //
+    // commands.spawn((
+    //     Sprite::from_image(ship_handle),
+    //     Player {
+    //         movement_speed: 500.0,
+    //         rotation_speed: f32::to_radians(360.0),
+    //     },
+    // ));
+    //
+    // commands.spawn((
+    //     Sprite::from_image(enemy_handle.clone()),
+    //     Transform::from_xyz(0.0 - horizontal_margin, 0.0, 0.0),
+    //     SnapToPlayer,
+    // ));
+    // commands.spawn((
+    //     Sprite::from_image(enemy_handle.clone()),
+    //     Transform::from_xyz(0.0, 0.0 - vertical_margin, 0.0),
+    //     SnapToPlayer,
+    // ));
+    // commands.spawn((
+    //     Sprite::from_image(enemy_handle.clone()),
+    //     Transform::from_xyz(0.0 + horizontal_margin, 0.0, 0.0),
+    //     RotateToPlayer {
+    //         rotation_speed: f32::to_radians(45.0),
+    //     },
+    // ));
+    // commands.spawn((
+    //     Sprite::from_image(enemy_handle),
+    //     Transform::from_xyz(0.0, 0.0 + vertical_margin, 0.0),
+    //     RotateToPlayer {
+    //         rotation_speed: f32::to_radians(90.0),
+    //     },
+    // ));
+}
+
+fn spawn_boids(commands: &mut Commands, boids_handle: &Handle<Image>) {
+    let mut rng = rand::rng();
+    for _ in 0..100 {
+        let rotation = rng.random_range(-f32::consts::PI..f32::consts::PI);
+        commands.spawn((
+            Sprite::from_image(boids_handle.clone()),
+            Boid {
+                separation_vel: Vec2::from_angle(rotation),
+                alignment_vel: Vec2::from_angle(rotation),
+                cohesion_vel: Vec2::from_angle(rotation),
+                rotation,
+            },
+            Transform::from_rotation(Quat::from_rotation_z(rotation)),
+        ));
+    }
 }
 
 fn imgui_example_ui(mut context: NonSendMut<ImguiContext>, mut state: ResMut<ImguiState>) {
@@ -107,7 +138,11 @@ fn imgui_example_ui(mut context: NonSendMut<ImguiContext>, mut state: ResMut<Img
         .size([300.0, 100.0], imgui::Condition::FirstUseEver)
         .position([0.0, 0.0], imgui::Condition::FirstUseEver)
         .build(|| {
-            ui.text(format!("{:.1} FPS | {:.2} ms per frame", io.framerate, 1.0 / io.framerate));
+            ui.text(format!(
+                "{:.1} FPS | {:.2} ms per frame",
+                io.framerate,
+                1.0 / io.framerate
+            ));
         });
 
     if state.demo_window_open {
@@ -115,7 +150,7 @@ fn imgui_example_ui(mut context: NonSendMut<ImguiContext>, mut state: ResMut<Img
     }
 }
 
-fn player_movement_system(
+/* fn player_movement_system(
     time: Res<Time>,
     keyboard_input: Res<ButtonInput<KeyCode>>,
     query: Single<(&Player, &mut Transform)>,
@@ -189,4 +224,4 @@ fn rotate2player_system(
 
         enemy_transform.rotate_z(rotation_angle);
     }
-}
+} */
