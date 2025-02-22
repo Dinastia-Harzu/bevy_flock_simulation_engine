@@ -15,7 +15,7 @@ fn main() {
         .add_plugins(DefaultPlugins)
         .add_systems(Startup, setup)
         .add_plugins(bevy_mod_imgui::ImguiPlugin {
-            ini_filename: Some("hello-world.ini".into()),
+            ini_filename: Some("imgui.ini".into()),
             font_oversample_h: 2,
             font_oversample_v: 2,
             ..default()
