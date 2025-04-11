@@ -1,6 +1,11 @@
 use core::f32;
 
-use bevy::{color::palettes::css::RED, ecs::query::QueryIter, math::FloatPow, prelude::*};
+use bevy::{
+    color::palettes::css::RED,
+    ecs::query::QueryIter,
+    math::{FloatPow, NormedVectorSpace},
+    prelude::*,
+};
 use bevy_mod_imgui::prelude::*;
 use rand::Rng;
 
@@ -134,7 +139,11 @@ fn imgui_ui(
     }
 }
 
-fn update_boids(mut query: Query<(Entity, &mut Boid, &mut Transform)>, boid_config_query: Single<&BoidConfig>, time: Res<Time>) {
+fn update_boids(
+    mut query: Query<(Entity, &mut Boid, &mut Transform)>,
+    boid_config_query: Single<&BoidConfig>,
+    time: Res<Time>,
+) {
     let boid_config = boid_config_query.into_inner();
     let mut align_vel;
     let mut iter1 = query.iter_mut();
@@ -144,6 +153,7 @@ fn update_boids(mut query: Query<(Entity, &mut Boid, &mut Transform)>, boid_conf
             &boid.velocity,
             &transform.translation.xy(),
             boid_config.perception_radius,
+            boid_config.speed,
             iter1.remaining_mut(),
         );
         boid.velocity += align_vel * time.delta_secs();
@@ -157,6 +167,7 @@ fn align(
     current_velocity: &Vec2,
     current_position: &Vec2,
     perception_radius: f32,
+    max_speed: f32,
     mut remaining_iter: QueryIter<'_, '_, (Entity, &mut Boid, &mut Transform), ()>,
 ) -> Vec2 {
     let mut steer = Vec2::ZERO;
@@ -172,7 +183,13 @@ fn align(
     }
     if total > 0 {
         steer /= total as f32;
+        steer = steer.normalize_or_zero() * max_speed;
         steer -= current_velocity;
+        steer = if steer.norm_squared() > max_speed.squared() {
+            steer.normalize() * max_speed
+        } else {
+            steer
+        };
     }
     steer
 }
