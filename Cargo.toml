@@ -1,5 +1,6 @@
 [package]
 name = "motor-fisicas"
+authors = ["Arturo García Richardson", "Arturo García Richardson <agrg11@alu.ua.es>"]
 version = "0.1.0"
 edition = "2021"
 
