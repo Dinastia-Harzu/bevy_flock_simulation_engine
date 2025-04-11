@@ -1,6 +1,6 @@
 use core::f32;
 
-use bevy::{math::NormedVectorSpace, prelude::*};
+use bevy::{color::palettes::css::RED, ecs::query::QueryIter, math::FloatPow, prelude::*};
 use bevy_mod_imgui::prelude::*;
 use rand::Rng;
 
@@ -18,12 +18,13 @@ struct Boid {
 }
 
 #[derive(Component)]
-struct BoidTestingUnit {
+struct BoidConfig {
     speed: f32,
     angle: f32,
+    perception_radius: f32,
 }
 
-impl BoidTestingUnit {
+impl BoidConfig {
     const MAX_VEL: f32 = 600.0;
 }
 
@@ -49,7 +50,7 @@ fn main() {
         })
         .add_systems(Startup, (setup).chain())
         .add_systems(FixedUpdate, update_boids)
-        .add_systems(PostUpdate, imgui_ui)
+        .add_systems(PostUpdate, (update_debug_boid, imgui_ui).chain())
         .run();
 }
 
@@ -67,7 +68,7 @@ fn spawn_boids(commands: &mut Commands, boids_handle: &Handle<Image>) {
     for _ in 0..MAX_BOIDS {
         // let vel = rng.random_range(0.0_f32..=60.0_f32);
         let vel = 60.0;
-        let rotation = rng.random_range(-pi..=pi);
+        let rotation = rng.random_range(-pi..=pi) - f32::consts::FRAC_PI_2;
         commands.spawn((
             Sprite::from_image(boids_handle.clone()),
             Boid {
@@ -81,9 +82,10 @@ fn spawn_boids(commands: &mut Commands, boids_handle: &Handle<Image>) {
         Boid {
             velocity: Vec2::ZERO,
         },
-        BoidTestingUnit {
+        BoidConfig {
             speed: 0.0,
             angle: 0.0,
+            perception_radius: 100.0,
         },
         Transform::from_xyz(0.0, 0.0, 1.0),
     ));
@@ -94,7 +96,7 @@ fn imgui_ui(
     mut context: NonSendMut<ImguiContext>,
     state: Res<ImguiState>,
     mut window_query: Query<Entity, With<Window>>,
-    mut boid_query: Single<(&BoidTestingUnit, &mut Boid, &mut Transform)>,
+    boid_query: Single<(&mut BoidConfig, &mut Boid, &mut Transform)>,
 ) {
     if state.common_window {
         let ui = context.ui();
@@ -111,27 +113,80 @@ fn imgui_ui(
             }
         });
 
-        let (_, mut boid, mut transform) = boid_query.into_inner();
+        let (mut boid_config, mut boid, mut transform) = boid_query.into_inner();
         let pi = f32::consts::PI;
-        let mut vel = boid.velocity.norm();
-        let mut angle = if vel == 0.0 {
-            0.0
-        } else {
-            boid.velocity.to_angle()
-        };
+        let mut vel = boid_config.speed;
+        let mut angle = boid_config.angle;
         ui.window("Parámetros del boid").build(|| {
-            ui.slider("Velocidad", 0.0, BoidTestingUnit::MAX_VEL, &mut vel);
-            ui.new_line();
+            ui.slider("Velocidad", 0.0, BoidConfig::MAX_VEL, &mut vel);
             ui.slider("Ángulo", -pi, pi, &mut angle);
+            ui.slider(
+                "Percepción",
+                0.0,
+                1000.0,
+                &mut boid_config.perception_radius,
+            );
         });
         boid.velocity = vel * Vec2::new(angle.cos(), angle.sin());
         transform.rotation = Quat::from_axis_angle(Vec3::Z, angle);
+        boid_config.speed = vel;
+        boid_config.angle = angle;
     }
 }
 
-fn update_boids(mut query: Query<(&mut Boid, &mut Transform)>, time: Res<Time>) {
-    for (mut boid, mut transform) in &mut query {
-        // boid.velocity += accel * time.delta_secs();
+fn update_boids(mut query: Query<(Entity, &mut Boid, &mut Transform)>, boid_config_query: Single<&BoidConfig>, time: Res<Time>) {
+    let boid_config = boid_config_query.into_inner();
+    let mut align_vel;
+    let mut iter1 = query.iter_mut();
+    while let Some((entity, mut boid, mut transform)) = iter1.next() {
+        align_vel = align(
+            entity,
+            &boid.velocity,
+            &transform.translation.xy(),
+            boid_config.perception_radius,
+            iter1.remaining_mut(),
+        );
+        boid.velocity += align_vel * time.delta_secs();
         transform.translation += boid.velocity.extend(0.0) * time.delta_secs();
+        transform.rotation = Quat::from_rotation_z(boid.velocity.to_angle());
     }
+}
+
+fn align(
+    current_entity: Entity,
+    current_velocity: &Vec2,
+    current_position: &Vec2,
+    perception_radius: f32,
+    mut remaining_iter: QueryIter<'_, '_, (Entity, &mut Boid, &mut Transform), ()>,
+) -> Vec2 {
+    let mut steer = Vec2::ZERO;
+    let mut total = 0;
+    while let Some((entity, boid, transform)) = remaining_iter.next() {
+        if current_entity.index() != entity.index()
+            && current_position.distance_squared(transform.translation.xy())
+                <= perception_radius.squared()
+        {
+            steer += boid.velocity;
+            total += 1;
+        }
+    }
+    if total > 0 {
+        steer /= total as f32;
+        steer -= current_velocity;
+    }
+    steer
+}
+
+fn update_debug_boid(
+    boid_query: Single<(&BoidConfig, &Transform), With<Boid>>,
+    mut gizmos: Gizmos,
+) {
+    let (boid_config, transform) = boid_query.into_inner();
+    gizmos
+        .circle_2d(
+            transform.translation.xy(),
+            boid_config.perception_radius,
+            RED,
+        )
+        .resolution(64);
 }
