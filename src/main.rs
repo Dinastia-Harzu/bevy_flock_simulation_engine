@@ -1,5 +1,5 @@
 use core::f32;
-use std::collections::HashMap;
+use std::{collections::HashMap, usize};
 
 use bevy::{
     color::palettes::css::*,
@@ -58,6 +58,12 @@ struct BoidSprite {
 #[derive(Component, Clone, Copy)]
 struct BoidTestingUnit;
 
+#[derive(Resource)]
+struct BoidEntities {
+    entities: Vec<Entity>,
+    current_id: usize,
+}
+
 fn main() {
     App::new()
         .add_plugins(DefaultPlugins.set(WindowPlugin {
@@ -98,6 +104,11 @@ fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
         alignment_factor: 1.0,
         cohesion_factor: 1.0,
     });
+    let max_boids = BoidConfiguration::MAX_BOIDS as usize;
+    commands.insert_resource(BoidEntities {
+        entities: Vec::with_capacity(max_boids + 1),
+        current_id: max_boids,
+    });
 
     commands.spawn(Camera2d);
 }
@@ -106,66 +117,54 @@ fn spawn_boids(
     mut commands: Commands,
     boid_configuration: Res<BoidConfiguration>,
     boid_sprite: Res<BoidSprite>,
+    mut boid_entities: ResMut<BoidEntities>,
 ) {
     let mut rng = rand::rng();
     let pi = f32::consts::PI;
     let bounds = SCREEN_SIZE / 2.0;
     for _ in 0..BoidConfiguration::MAX_BOIDS {
         let angle = rng.random_range(-pi..=pi) - f32::consts::FRAC_PI_2;
-        spawn_boid(
-            &mut commands,
-            &boid_sprite,
+        let entity = commands
+            .spawn((
+                Boid {
+                    speed: boid_configuration.speed,
+                    angle,
+                },
+                Sprite {
+                    image: boid_sprite.fireball_handle.clone(),
+                    custom_size: Some(boid_sprite.size),
+                    ..Default::default()
+                },
+                Transform {
+                    translation: (
+                        rng.random_range(-bounds.x..=bounds.x),
+                        rng.random_range(-bounds.y..=bounds.y),
+                        0.0,
+                    )
+                        .into(),
+                    rotation: Quat::from_axis_angle(Vec3::Z, angle),
+                    ..Default::default()
+                },
+            ))
+            .id();
+        boid_entities.entities.push(entity);
+    }
+    let selected_entity = commands
+        .spawn((
             Boid {
-                speed: boid_configuration.speed,
-                angle,
+                speed: 0.0,
+                angle: 0.0,
             },
-            None,
-            Transform {
-                translation: (
-                    rng.random_range(-bounds.x..=bounds.x),
-                    rng.random_range(-bounds.y..=bounds.y),
-                    0.0,
-                )
-                    .into(),
-                rotation: Quat::from_axis_angle(Vec3::Z, angle),
+            Sprite {
+                image: boid_sprite.galaga_ship_handle.clone(),
+                custom_size: Some(boid_sprite.size),
                 ..Default::default()
             },
-        );
-    }
-    spawn_boid(
-        &mut commands,
-        &boid_sprite,
-        Boid {
-            speed: 0.0,
-            angle: 0.0,
-        },
-        Some(BoidTestingUnit),
-        Transform::from_xyz(0.0, 0.0, 1.0),
-    );
-}
-
-fn spawn_boid(
-    commands: &mut Commands,
-    boid_sprite: &Res<BoidSprite>,
-    boid: Boid,
-    boid_testing_unit_opt: Option<BoidTestingUnit>,
-    transform: Transform,
-) {
-    let image = if boid_testing_unit_opt.is_some() {
-        boid_sprite.galaga_ship_handle.clone()
-    } else {
-        boid_sprite.fireball_handle.clone()
-    };
-    let sprite = Sprite {
-        image,
-        custom_size: Some(boid_sprite.size),
-        ..Default::default()
-    };
-    if let Some(boid_testing_unit) = boid_testing_unit_opt {
-        commands.spawn((sprite, boid, boid_testing_unit, transform));
-    } else {
-        commands.spawn((sprite, boid, transform));
-    }
+            Transform::from_xyz(0.0, 0.0, 1.0),
+            BoidTestingUnit,
+        ))
+        .id();
+    boid_entities.entities.push(selected_entity);
 }
 
 fn imgui_ui(
@@ -175,7 +174,8 @@ fn imgui_ui(
     mut boid_configuration: ResMut<BoidConfiguration>,
     boid_sprite: Res<BoidSprite>,
     mut window_query: Query<Entity, With<Window>>,
-    boid_query_opt: Option<Single<(Entity, &mut Boid, &mut Transform), With<BoidTestingUnit>>>,
+    boid_query_opt: Option<Single<(Entity, &mut Boid), With<BoidTestingUnit>>>,
+    mut boid_entities: ResMut<BoidEntities>,
     time: Res<Time>,
 ) {
     if state.common_window {
@@ -193,11 +193,31 @@ fn imgui_ui(
             }
         });
 
-        if boid_query_opt.is_some() {
-            let boid_query = boid_query_opt.unwrap();
-            let (entity, mut boid, mut transform) = boid_query.into_inner();
+        if let Some(single_boid) = boid_query_opt {
+            let (entity, mut boid) = single_boid.into_inner();
             let pi = f32::consts::PI;
+            let mut change_selected_boid = false;
             ui.window("Boid controlado").build(|| {
+                if ui.arrow_button("##previous", Direction::Left) {
+                    boid_entities.current_id = if boid_entities.current_id == 0 {
+                        boid_entities.entities.len() - 1
+                    } else {
+                        boid_entities.current_id - 1
+                    };
+                    change_selected_boid = true;
+                }
+                ui.same_line();
+                if ui.arrow_button("##next", Direction::Right) {
+                    boid_entities.current_id =
+                        if boid_entities.current_id == boid_entities.entities.len() - 1 {
+                            0
+                        } else {
+                            boid_entities.current_id + 1
+                        };
+                    change_selected_boid = true;
+                }
+                ui.same_line();
+                ui.text(format!("Entidad actual: {}", entity.index()));
                 ui.slider(
                     "Velocidad",
                     0.0,
@@ -235,27 +255,27 @@ fn imgui_ui(
                     BoidConfiguration::MAX_COHESION_FACTOR,
                     &mut boid_configuration.cohesion_factor,
                 );
-                ui.separator();
-                if ui.button("Eliminar boid") {
-                    commands.entity(entity).despawn();
-                }
             });
-            transform.rotation = Quat::from_axis_angle(Vec3::Z, boid.angle);
-        } else {
-            ui.window("Boid controlado").build(|| {
-                if ui.button("Crear boid controlado") {
-                    spawn_boid(
-                        &mut commands,
-                        &boid_sprite,
-                        Boid {
-                            speed: 0.0,
-                            angle: 0.0,
-                        },
-                        Some(BoidTestingUnit),
-                        Transform::from_xyz(0.0, 0.0, 1.0),
-                    );
-                }
-            });
+            if change_selected_boid {
+                commands
+                    .entity(entity)
+                    .remove::<BoidTestingUnit>()
+                    .remove::<Sprite>()
+                    .insert(Sprite {
+                        image: boid_sprite.fireball_handle.clone(),
+                        custom_size: Some(boid_sprite.size),
+                        ..Default::default()
+                    });
+                commands
+                    .entity(boid_entities.entities[boid_entities.current_id])
+                    .insert(BoidTestingUnit)
+                    .remove::<Sprite>()
+                    .insert(Sprite {
+                        image: boid_sprite.galaga_ship_handle.clone(),
+                        custom_size: Some(boid_sprite.size),
+                        ..Default::default()
+                    });
+            }
         }
     }
 }
