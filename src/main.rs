@@ -1,33 +1,61 @@
 use core::f32;
+use std::collections::HashMap;
 
-use bevy::{color::palettes::css::*, ecs::query::QueryIter, math::FloatPow, prelude::*};
+use bevy::{
+    color::palettes::css::*,
+    math::{FloatPow, NormedVectorSpace},
+    prelude::*,
+};
 use bevy_mod_imgui::prelude::*;
 use rand::Rng;
 
 const SCREEN_SIZE: Vec2 = Vec2::new(1920.0, 1080.0);
-const MAX_BOIDS: u32 = 100;
 
 #[derive(Resource)]
 struct ImguiState {
     common_window: bool,
 }
 
-#[derive(Component)]
+#[derive(Component, Clone, Copy)]
 struct Boid {
-    velocity: Vec2,
-}
-
-#[derive(Component)]
-struct BoidConfig {
     speed: f32,
     angle: f32,
-    outer_perception_radius: f32,
-    inner_perception_radius: f32,
 }
 
-impl BoidConfig {
-    const MAX_VEL: f32 = 600.0;
+impl Boid {
+    fn velocity(&self) -> Vec2 {
+        Vec2::from_angle(self.angle) * self.speed
+    }
 }
+
+#[derive(Resource)]
+struct BoidConfiguration {
+    speed: f32,
+    inner_perception_radius: f32,
+    outer_perception_radius: f32,
+    separation_factor: f32,
+    alignment_factor: f32,
+    cohesion_factor: f32,
+}
+
+impl BoidConfiguration {
+    const MAX_VEL: f32 = 600.0;
+    const MAX_BOIDS: u32 = 100;
+    const MAX_INNER_PERCEPTION_RADIUS: f32 = 500.0;
+    const MAX_OUTER_PERCEPTION_RADIUS: f32 = 2000.0;
+    const MAX_SEPARATION_FACTOR: f32 = 10.0;
+    const MAX_ALIGNMENT_FACTOR: f32 = 10.0;
+    const MAX_COHESION_FACTOR: f32 = 10.0;
+}
+
+#[derive(Resource)]
+struct BoidSprite {
+    handle: Handle<Image>,
+    size: Vec2,
+}
+
+#[derive(Component, Clone, Copy)]
+struct BoidTestingUnit;
 
 fn main() {
     App::new()
@@ -49,7 +77,7 @@ fn main() {
         .insert_resource(ImguiState {
             common_window: true,
         })
-        .add_systems(Startup, (setup).chain())
+        .add_systems(Startup, (setup, spawn_boids).chain())
         .add_systems(FixedUpdate, (update_boids, wrap_edges).chain())
         .add_systems(PostUpdate, (update_debug_boid, imgui_ui).chain())
         .run();
@@ -58,24 +86,40 @@ fn main() {
 fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
     let boid_handle = asset_server.load("textures/wave_46.png");
 
+    commands.insert_resource(BoidSprite {
+        handle: boid_handle,
+        size: (63.0, 35.0).into(),
+    });
+    commands.insert_resource(BoidConfiguration {
+        speed: 100.0,
+        inner_perception_radius: 100.0,
+        outer_perception_radius: 500.0,
+        separation_factor: 1.0,
+        alignment_factor: 1.0,
+        cohesion_factor: 1.0
+    });
+
     commands.spawn(Camera2d);
 
-    spawn_boids(&mut commands, &boid_handle);
+    // spawn_boids(&mut commands, &boid_handle);
 }
 
-fn spawn_boids(commands: &mut Commands, boids_handle: &Handle<Image>) {
+fn spawn_boids(
+    mut commands: Commands,
+    boid_configuration: Res<BoidConfiguration>,
+    boid_sprite: Res<BoidSprite>,
+) {
     let mut rng = rand::rng();
     let pi = f32::consts::PI;
     let bounds = SCREEN_SIZE / 2.0;
-    for _ in 0..MAX_BOIDS {
-        // let vel = rng.random_range(0.0_f32..=60.0_f32);
-        let vel = 60.0;
-        let rotation = rng.random_range(-pi..=pi) - f32::consts::FRAC_PI_2;
+    for _ in 0..BoidConfiguration::MAX_BOIDS {
+        let angle = rng.random_range(-pi..=pi) - f32::consts::FRAC_PI_2;
         spawn_boid(
-            commands,
-            boids_handle,
+            &mut commands,
+            &boid_sprite,
             Boid {
-                velocity: vel * Vec2::new(rotation.cos(), rotation.sin()),
+                speed: boid_configuration.speed,
+                angle,
             },
             None,
             Transform {
@@ -85,42 +129,37 @@ fn spawn_boids(commands: &mut Commands, boids_handle: &Handle<Image>) {
                     0.0,
                 )
                     .into(),
-                rotation: Quat::from_axis_angle(Vec3::Z, rotation),
+                rotation: Quat::from_axis_angle(Vec3::Z, angle),
                 ..Default::default()
             },
         );
     }
     spawn_boid(
-        commands,
-        boids_handle,
+        &mut commands,
+        &boid_sprite,
         Boid {
-            velocity: Vec2::ZERO,
-        },
-        Some(BoidConfig {
             speed: 0.0,
             angle: 0.0,
-            outer_perception_radius: 1000.0,
-            inner_perception_radius: 100.0,
-        }),
+        },
+        Some(BoidTestingUnit),
         Transform::from_xyz(0.0, 0.0, 1.0),
     );
 }
 
 fn spawn_boid(
     commands: &mut Commands,
-    boid_sprite_handle: &Handle<Image>,
+    boid_sprite: &Res<BoidSprite>,
     boid: Boid,
-    boid_config: Option<BoidConfig>,
+    boid_testing_unit_opt: Option<BoidTestingUnit>,
     transform: Transform,
 ) {
-    let sprite_size = Vec2::new(63.0, 35.0);
     let sprite = Sprite {
-        image: boid_sprite_handle.clone(),
-        custom_size: Some(sprite_size),
+        image: boid_sprite.handle.clone(),
+        custom_size: Some(boid_sprite.size),
         ..Default::default()
     };
-    if boid_config.is_some() {
-        commands.spawn((sprite, boid, boid_config.unwrap(), transform));
+    if let Some(boid_testing_unit) = boid_testing_unit_opt {
+        commands.spawn((sprite, boid, boid_testing_unit, transform));
     } else {
         commands.spawn((sprite, boid, transform));
     }
@@ -130,18 +169,20 @@ fn imgui_ui(
     mut commands: Commands,
     mut context: NonSendMut<ImguiContext>,
     state: Res<ImguiState>,
-    asset_server: Res<AssetServer>,
+    mut boid_configuration: ResMut<BoidConfiguration>,
+    boid_sprite: Res<BoidSprite>,
     mut window_query: Query<Entity, With<Window>>,
-    boid_query_opt: Option<Single<(Entity, &mut BoidConfig, &mut Boid, &mut Transform)>>,
+    boid_query_opt: Option<Single<(Entity, &mut Boid, &mut Transform), With<BoidTestingUnit>>>,
+    time: Res<Time>,
 ) {
     if state.common_window {
         let ui = context.ui();
-        let io = ui.io();
+        let dt = time.delta_secs();
         ui.window("Hello world").build(|| {
             ui.text(format!(
                 "{:.1} FPS | {:.2} ms per frame",
-                1.0 / io.delta_time,
-                1000.0 * io.delta_time
+                1.0 / dt,
+                1000.0 * dt
             ));
             if ui.button("Terminar programa") {
                 let window = window_query.single_mut();
@@ -151,49 +192,63 @@ fn imgui_ui(
 
         if boid_query_opt.is_some() {
             let boid_query = boid_query_opt.unwrap();
-            let (entity, mut boid_config, mut boid, mut transform) = boid_query.into_inner();
+            let (entity, mut boid, mut transform) = boid_query.into_inner();
             let pi = f32::consts::PI;
-            let mut vel = boid_config.speed;
-            let mut angle = boid_config.angle;
             ui.window("Boid controlado").build(|| {
-                ui.slider("Velocidad", 0.0, BoidConfig::MAX_VEL, &mut vel);
-                ui.slider("Ángulo", -pi, pi, &mut angle);
+                ui.slider(
+                    "Velocidad",
+                    0.0,
+                    BoidConfiguration::MAX_VEL,
+                    &mut boid_configuration.speed,
+                );
+                ui.slider("Ángulo", -pi, pi, &mut boid.angle);
                 ui.slider(
                     "Percepción exterior",
-                    boid_config.inner_perception_radius,
-                    2000.0,
-                    &mut boid_config.outer_perception_radius,
+                    boid_configuration.inner_perception_radius,
+                    BoidConfiguration::MAX_OUTER_PERCEPTION_RADIUS,
+                    &mut boid_configuration.outer_perception_radius,
                 );
                 ui.slider(
                     "Percepción interior",
                     0.0,
-                    500.0,
-                    &mut boid_config.inner_perception_radius,
+                    BoidConfiguration::MAX_INNER_PERCEPTION_RADIUS,
+                    &mut boid_configuration.inner_perception_radius,
+                );
+                ui.slider(
+                    "Factor de separación",
+                    0.0,
+                    BoidConfiguration::MAX_SEPARATION_FACTOR,
+                    &mut boid_configuration.separation_factor,
+                );
+                ui.slider(
+                    "Factor de alineamiento",
+                    0.0,
+                    BoidConfiguration::MAX_ALIGNMENT_FACTOR,
+                    &mut boid_configuration.alignment_factor,
+                );
+                ui.slider(
+                    "Factor de cohesión",
+                    0.0,
+                    BoidConfiguration::MAX_COHESION_FACTOR,
+                    &mut boid_configuration.cohesion_factor,
                 );
                 ui.separator();
                 if ui.button("Eliminar boid") {
                     commands.entity(entity).despawn();
                 }
             });
-            boid.velocity = vel * Vec2::new(angle.cos(), angle.sin());
-            transform.rotation = Quat::from_axis_angle(Vec3::Z, angle);
-            boid_config.speed = vel;
-            boid_config.angle = angle;
+            transform.rotation = Quat::from_axis_angle(Vec3::Z, boid.angle);
         } else {
             ui.window("Boid controlado").build(|| {
                 if ui.button("Crear boid controlado") {
                     spawn_boid(
                         &mut commands,
-                        &asset_server.load("textures/wave_46.png"),
+                        &boid_sprite,
                         Boid {
-                            velocity: Vec2::ZERO,
-                        },
-                        Some(BoidConfig {
-                            speed: 50.0,
+                            speed: 0.0,
                             angle: 0.0,
-                            outer_perception_radius: 1000.0,
-                            inner_perception_radius: 100.0,
-                        }),
+                        },
+                        Some(BoidTestingUnit),
                         Transform::from_xyz(0.0, 0.0, 1.0),
                     );
                 }
@@ -204,124 +259,78 @@ fn imgui_ui(
 
 fn update_boids(
     mut query: Query<(Entity, &mut Boid, &mut Transform)>,
-    boid_config_query: Single<&BoidConfig>,
+    boid_configuration: Res<BoidConfiguration>,
     time: Res<Time>,
 ) {
-    let boid_config = boid_config_query.into_inner();
-    let mut iter1 = query.iter_mut();
-    while let Some((entity, mut boid, mut transform)) = iter1.next() {
-        let align_vel = align(
-            entity,
-            &boid.velocity,
-            &transform.translation.xy(),
-            boid_config.outer_perception_radius,
-            boid_config.speed,
-            iter1.remaining_mut(),
-        );
-        let cohesion_vel = cohesion(
-            entity,
-            &boid.velocity,
-            &transform.translation.xy(),
-            boid_config.outer_perception_radius,
-            boid_config.speed,
-            iter1.remaining_mut(),
-        );
-        let separation_vel = separation(
-            entity,
-            &boid.velocity,
-            &transform.translation.xy(),
-            boid_config.inner_perception_radius,
-            boid_config.speed,
-            iter1.remaining_mut(),
-        );
-        boid.velocity += (align_vel + cohesion_vel + separation_vel) * time.delta_secs();
-        boid.velocity = boid.velocity.normalize_or_zero() * boid_config.speed;
-        transform.translation += boid.velocity.extend(0.0) * time.delta_secs();
-        transform.rotation = Quat::from_rotation_z(boid.velocity.to_angle());
-    }
-}
+    let mut steerings = HashMap::new();
+    let mut combinations = query.iter_combinations();
+    while let Some([(entity1, boid1, transform1), (entity2, boid2, transform2)]) =
+        combinations.next()
+    {
+        let pos1 = transform1.translation.xy();
+        let pos2 = transform2.translation.xy();
+        let initial_values = (Vec2::ZERO, Vec2::ZERO, Vec2::ZERO, 0.0f32, 0.0f32);
+        let pos1_to_pos2_squared = pos1.distance_squared(pos2);
+        let pos1_to_pos2 = pos1.distance(pos2);
+        let in_inner_radius =
+            pos1_to_pos2_squared <= boid_configuration.inner_perception_radius.squared();
+        let in_outer_radius =
+            pos1_to_pos2_squared <= boid_configuration.outer_perception_radius.squared();
 
-fn align(
-    current_entity: Entity,
-    current_velocity: &Vec2,
-    current_position: &Vec2,
-    perception_radius: f32,
-    max_speed: f32,
-    mut remaining_iter: QueryIter<'_, '_, (Entity, &mut Boid, &mut Transform), ()>,
-) -> Vec2 {
-    let mut steer = Vec2::ZERO;
-    let mut total = 0;
-    while let Some((entity, boid, transform)) = remaining_iter.next() {
-        if current_entity.index() != entity.index()
-            && current_position.distance_squared(transform.translation.xy())
-                <= perception_radius.squared()
+        let (cohesion1, separation1, alignment1, total_outer1, total_inner1) =
+            steerings.entry(entity1).or_insert(initial_values);
+        if in_outer_radius {
+            *cohesion1 += pos2;
+            *alignment1 += boid2.velocity();
+            *total_outer1 += 1.0;
+        }
+        if in_inner_radius {
+            let other_to_current = pos1 - pos2;
+            *separation1 += other_to_current / pos1_to_pos2;
+            *total_inner1 += 1.0;
+        }
+
+        let (cohesion2, separation2, alignment2, total_outer2, total_inner2) =
+            steerings.entry(entity2).or_insert(initial_values);
+        if in_outer_radius {
+            *cohesion2 += pos1;
+            *alignment2 += boid1.velocity();
+            *total_outer2 += 1.0;
+        }
+        if in_inner_radius {
+            let other_to_current = pos2 - pos1;
+            *separation2 += other_to_current / pos1_to_pos2;
+            *total_inner2 += 1.0;
+        }
+    }
+    for (entity, mut boid, mut transform) in &mut query {
+        if let Some((cohesion, separation, alignment, total_outer, total_inner)) =
+            steerings.get_mut(&entity)
         {
-            steer += boid.velocity;
-            total += 1;
-        }
-    }
-    if total > 0 {
-        steer /= total as f32;
-        steer = steer.normalize_or_zero() * max_speed;
-        steer -= current_velocity;
-    }
-    steer
-}
+            *cohesion /= *total_outer;
+            *cohesion = (*cohesion - transform.translation.xy()) / 100.0;
+            *cohesion *= boid_configuration.cohesion_factor;
 
-fn cohesion(
-    current_entity: Entity,
-    current_velocity: &Vec2,
-    current_position: &Vec2,
-    perception_radius: f32,
-    max_speed: f32,
-    mut remaining_iter: QueryIter<'_, '_, (Entity, &mut Boid, &mut Transform), ()>,
-) -> Vec2 {
-    let mut steer = Vec2::ZERO;
-    let mut total = 0;
-    while let Some((entity, _, transform)) = remaining_iter.next() {
-        if current_entity.index() != entity.index()
-            && current_position.distance_squared(transform.translation.xy())
-                <= perception_radius.squared()
-        {
-            steer += transform.translation.xy();
-            total += 1;
-        }
-    }
-    if total > 0 {
-        steer /= total as f32;
-        steer -= current_position;
-        steer = steer.normalize_or_zero() * max_speed;
-        steer -= current_velocity;
-    }
-    steer
-}
+            *separation /= *total_inner;
+            *separation *= boid_configuration.separation_factor;
 
-fn separation(
-    current_entity: Entity,
-    current_velocity: &Vec2,
-    current_position: &Vec2,
-    perception_radius: f32,
-    max_speed: f32,
-    mut remaining_iter: QueryIter<'_, '_, (Entity, &mut Boid, &mut Transform), ()>,
-) -> Vec2 {
-    let mut steer = Vec2::ZERO;
-    let mut total = 0;
-    while let Some((entity, _, transform)) = remaining_iter.next() {
-        let d = current_position.distance_squared(transform.translation.xy());
-        if current_entity.index() != entity.index() && d <= perception_radius.squared() {
-            let mut diff = current_position - transform.translation.xy();
-            diff /= d;
-            steer += diff;
-            total += 1;
+            *alignment /= *total_outer;
+            *alignment = (*alignment - boid.velocity()) / 8.0;
+            *alignment *= boid_configuration.alignment_factor;
+
+            let mut velocity = boid.velocity();
+            velocity += *cohesion + *alignment + *separation;
+            // velocity += *cohesion + *alignment;
+            // velocity += *separation;
+            velocity =
+                velocity.normalize_or(Vec2::from_angle(boid.angle)) * boid_configuration.speed;
+
+            boid.speed = velocity.norm();
+            boid.angle = velocity.to_angle();
+            transform.translation += (velocity * time.delta_secs()).extend(0.0);
+            transform.rotation = Quat::from_axis_angle(Vec3::Z, boid.angle);
         }
     }
-    if total > 0 {
-        steer /= total as f32;
-        // steer -= current_position;
-        steer = steer.normalize_or_zero() * max_speed;
-        steer -= current_velocity;
-    }
-    steer
 }
 
 fn wrap_edges(mut query: Query<&mut Transform, With<Boid>>) {
@@ -342,21 +351,22 @@ fn wrap_edges(mut query: Query<&mut Transform, With<Boid>>) {
 }
 
 fn update_debug_boid(
-    boid_query: Single<(&BoidConfig, &Transform), With<Boid>>,
+    boid_query: Single<&Transform, With<BoidTestingUnit>>,
+    boid_configuration: Res<BoidConfiguration>,
     mut gizmos: Gizmos,
 ) {
-    let (boid_config, transform) = boid_query.into_inner();
+    let transform = boid_query.into_inner();
     gizmos
         .circle_2d(
             transform.translation.xy(),
-            boid_config.inner_perception_radius,
+            boid_configuration.inner_perception_radius,
             RED,
         )
         .resolution(64);
     gizmos
         .circle_2d(
             transform.translation.xy(),
-            boid_config.outer_perception_radius,
+            boid_configuration.outer_perception_radius,
             GREEN,
         )
         .resolution(64);
