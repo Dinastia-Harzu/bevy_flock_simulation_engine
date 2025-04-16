@@ -50,7 +50,8 @@ impl BoidConfiguration {
 
 #[derive(Resource)]
 struct BoidSprite {
-    handle: Handle<Image>,
+    fireball_handle: Handle<Image>,
+    galaga_ship_handle: Handle<Image>,
     size: Vec2,
 }
 
@@ -84,10 +85,9 @@ fn main() {
 }
 
 fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
-    let boid_handle = asset_server.load("textures/wave_46.png");
-
     commands.insert_resource(BoidSprite {
-        handle: boid_handle,
+        fireball_handle: asset_server.load("textures/wave-fireball.png"),
+        galaga_ship_handle: asset_server.load("textures/wave-blue-fireball.png"),
         size: (63.0, 35.0).into(),
     });
     commands.insert_resource(BoidConfiguration {
@@ -96,12 +96,10 @@ fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
         outer_perception_radius: 500.0,
         separation_factor: 1.0,
         alignment_factor: 1.0,
-        cohesion_factor: 1.0
+        cohesion_factor: 1.0,
     });
 
     commands.spawn(Camera2d);
-
-    // spawn_boids(&mut commands, &boid_handle);
 }
 
 fn spawn_boids(
@@ -153,8 +151,13 @@ fn spawn_boid(
     boid_testing_unit_opt: Option<BoidTestingUnit>,
     transform: Transform,
 ) {
+    let image = if boid_testing_unit_opt.is_some() {
+        boid_sprite.galaga_ship_handle.clone()
+    } else {
+        boid_sprite.fireball_handle.clone()
+    };
     let sprite = Sprite {
-        image: boid_sprite.handle.clone(),
+        image,
         custom_size: Some(boid_sprite.size),
         ..Default::default()
     };
@@ -351,23 +354,25 @@ fn wrap_edges(mut query: Query<&mut Transform, With<Boid>>) {
 }
 
 fn update_debug_boid(
-    boid_query: Single<&Transform, With<BoidTestingUnit>>,
+    boid_query: Option<Single<&Transform, With<BoidTestingUnit>>>,
     boid_configuration: Res<BoidConfiguration>,
     mut gizmos: Gizmos,
 ) {
-    let transform = boid_query.into_inner();
-    gizmos
-        .circle_2d(
-            transform.translation.xy(),
-            boid_configuration.inner_perception_radius,
-            RED,
-        )
-        .resolution(64);
-    gizmos
-        .circle_2d(
-            transform.translation.xy(),
-            boid_configuration.outer_perception_radius,
-            GREEN,
-        )
-        .resolution(64);
+    if let Some(boid) = boid_query {
+        let transform = boid.into_inner();
+        gizmos
+            .circle_2d(
+                transform.translation.xy(),
+                boid_configuration.inner_perception_radius,
+                RED,
+            )
+            .resolution(64);
+        gizmos
+            .circle_2d(
+                transform.translation.xy(),
+                boid_configuration.outer_perception_radius,
+                GREEN,
+            )
+            .resolution(64);
+    }
 }
