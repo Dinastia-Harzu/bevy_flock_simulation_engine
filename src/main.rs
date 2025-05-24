@@ -5,16 +5,13 @@ use bevy::{
     color::palettes::css::*,
     math::{FloatPow, NormedVectorSpace},
     prelude::*,
+    window::{PrimaryMonitor, PrimaryWindow},
 };
-use bevy_mod_imgui::prelude::*;
+use bevy_egui::{egui, EguiContext, EguiContextPass, EguiPlugin};
+use bevy_inspector_egui::prelude::*;
 use rand::Rng;
 
 const SCREEN_SIZE: Vec2 = Vec2::new(1920.0, 1080.0);
-
-#[derive(Resource)]
-struct ImguiState {
-    common_window: bool,
-}
 
 #[derive(Component, Clone, Copy)]
 struct Boid {
@@ -28,7 +25,8 @@ impl Boid {
     }
 }
 
-#[derive(Resource)]
+#[derive(Resource, Reflect, InspectorOptions)]
+#[reflect(Resource, InspectorOptions)]
 struct BoidConfiguration {
     speed: f32,
     inner_perception_radius: f32,
@@ -75,18 +73,16 @@ fn main() {
             }),
             ..Default::default()
         }))
-        .add_plugins(ImguiPlugin {
-            ini_filename: Some("imgui.ini".into()),
-            ..default()
+        .add_plugins(EguiPlugin {
+            enable_multipass_for_primary_context: true,
         })
+        .add_plugins(bevy_inspector_egui::DefaultInspectorConfigPlugin)
         .insert_resource(ClearColor(Color::srgba(0.0, 0.0, 0.0, 1.0)))
         .insert_resource(Time::<Fixed>::from_hz(60.0))
-        .insert_resource(ImguiState {
-            common_window: true,
-        })
         .add_systems(Startup, (setup, spawn_boids).chain())
         .add_systems(FixedUpdate, (update_boids, wrap_edges).chain())
-        .add_systems(PostUpdate, (update_debug_boid, imgui_ui).chain())
+        .add_systems(PostUpdate, (update_debug_boid).chain())
+        .add_systems(EguiContextPass, inspector_ui)
         .run();
 }
 
@@ -111,6 +107,24 @@ fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
     });
 
     commands.spawn(Camera2d);
+}
+
+fn inspector_ui(world: &mut World) {
+    let Ok(egui_context) = world
+        .query_filtered::<&mut EguiContext, With<PrimaryWindow>>()
+        .single(world)
+    else {
+        return;
+    };
+    let mut egui_context = egui_context.clone();
+
+    egui::Window::new("UI").show(egui_context.get_mut(), |ui| {
+        egui::ScrollArea::vertical().show(ui, |ui| {
+            bevy_inspector_egui::bevy_inspector::ui_for_world(world, ui);
+            ui.heading("Entities");
+            bevy_inspector_egui::bevy_inspector::ui_for_entities(world, ui);
+        });
+    });
 }
 
 fn spawn_boids(
@@ -165,119 +179,6 @@ fn spawn_boids(
         ))
         .id();
     boid_entities.entities.push(selected_entity);
-}
-
-fn imgui_ui(
-    mut commands: Commands,
-    mut context: NonSendMut<ImguiContext>,
-    state: Res<ImguiState>,
-    mut boid_configuration: ResMut<BoidConfiguration>,
-    boid_sprite: Res<BoidSprite>,
-    mut window_query: Query<Entity, With<Window>>,
-    boid_query_opt: Option<Single<(Entity, &mut Boid), With<BoidTestingUnit>>>,
-    mut boid_entities: ResMut<BoidEntities>,
-    time: Res<Time>,
-) {
-    if state.common_window {
-        let ui = context.ui();
-        let dt = time.delta_secs();
-        ui.window("Hello world").build(|| {
-            ui.text(format!(
-                "{:.1} FPS | {:.2} ms per frame",
-                1.0 / dt,
-                1000.0 * dt
-            ));
-            if ui.button("Terminar programa") {
-                let window = window_query.single_mut();
-                commands.entity(window).despawn();
-            }
-        });
-
-        if let Some(single_boid) = boid_query_opt {
-            let (entity, mut boid) = single_boid.into_inner();
-            let pi = f32::consts::PI;
-            let mut change_selected_boid = false;
-            ui.window("Boid controlado").build(|| {
-                if ui.arrow_button("##previous", Direction::Left) {
-                    boid_entities.current_id = if boid_entities.current_id == 0 {
-                        boid_entities.entities.len() - 1
-                    } else {
-                        boid_entities.current_id - 1
-                    };
-                    change_selected_boid = true;
-                }
-                ui.same_line();
-                if ui.arrow_button("##next", Direction::Right) {
-                    boid_entities.current_id =
-                        if boid_entities.current_id == boid_entities.entities.len() - 1 {
-                            0
-                        } else {
-                            boid_entities.current_id + 1
-                        };
-                    change_selected_boid = true;
-                }
-                ui.same_line();
-                ui.text(format!("Entidad actual: {}", entity.index()));
-                ui.slider(
-                    "Velocidad",
-                    0.0,
-                    BoidConfiguration::MAX_VEL,
-                    &mut boid_configuration.speed,
-                );
-                ui.slider("Ángulo", -pi, pi, &mut boid.angle);
-                ui.slider(
-                    "Percepción exterior",
-                    boid_configuration.inner_perception_radius,
-                    BoidConfiguration::MAX_OUTER_PERCEPTION_RADIUS,
-                    &mut boid_configuration.outer_perception_radius,
-                );
-                ui.slider(
-                    "Percepción interior",
-                    0.0,
-                    BoidConfiguration::MAX_INNER_PERCEPTION_RADIUS,
-                    &mut boid_configuration.inner_perception_radius,
-                );
-                ui.slider(
-                    "Factor de separación",
-                    0.0,
-                    BoidConfiguration::MAX_SEPARATION_FACTOR,
-                    &mut boid_configuration.separation_factor,
-                );
-                ui.slider(
-                    "Factor de alineamiento",
-                    0.0,
-                    BoidConfiguration::MAX_ALIGNMENT_FACTOR,
-                    &mut boid_configuration.alignment_factor,
-                );
-                ui.slider(
-                    "Factor de cohesión",
-                    0.0,
-                    BoidConfiguration::MAX_COHESION_FACTOR,
-                    &mut boid_configuration.cohesion_factor,
-                );
-            });
-            if change_selected_boid {
-                commands
-                    .entity(entity)
-                    .remove::<BoidTestingUnit>()
-                    .remove::<Sprite>()
-                    .insert(Sprite {
-                        image: boid_sprite.fireball_handle.clone(),
-                        custom_size: Some(boid_sprite.size),
-                        ..Default::default()
-                    });
-                commands
-                    .entity(boid_entities.entities[boid_entities.current_id])
-                    .insert(BoidTestingUnit)
-                    .remove::<Sprite>()
-                    .insert(Sprite {
-                        image: boid_sprite.galaga_ship_handle.clone(),
-                        custom_size: Some(boid_sprite.size),
-                        ..Default::default()
-                    });
-            }
-        }
-    }
 }
 
 fn update_boids(
