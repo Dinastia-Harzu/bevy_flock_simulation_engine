@@ -1,5 +1,5 @@
+# Ignorar carpeta de generables
 /target
 
-imgui.ini
-
-assets/
+# Ignorar carpeta de recursos (imágenes, audio, etc.)
+/assets
