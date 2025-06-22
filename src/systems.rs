@@ -24,11 +24,6 @@ pub fn setup(mut commands: Commands, asset_server: Res<AssetServer>) {
         alignment_factor: 1.0,
         cohesion_factor: 1.0,
     });
-    let max_boids = BoidConfiguration::MAX_BOIDS as usize;
-    commands.insert_resource(BoidEntities {
-        entities: Vec::with_capacity(max_boids + 1),
-        current_id: max_boids,
-    });
 
     commands.spawn(Camera2d);
 }
@@ -55,54 +50,47 @@ pub fn spawn_boids(
     mut commands: Commands,
     boid_configuration: Res<BoidConfiguration>,
     boid_sprite: Res<BoidSprite>,
-    mut boid_entities: ResMut<BoidEntities>,
 ) {
     let mut rng = rand::rng();
     let pi = f32::consts::PI;
     let bounds = SCREEN_SIZE / 2.0;
     for _ in 0..BoidConfiguration::MAX_BOIDS {
         let angle = rng.random_range(-pi..=pi) - f32::consts::FRAC_PI_2;
-        let entity = commands
-            .spawn((
-                Boid {
-                    speed: boid_configuration.speed,
-                    angle,
-                },
-                Sprite {
-                    image: boid_sprite.fireball_handle.clone(),
-                    custom_size: Some(boid_sprite.size),
-                    ..Default::default()
-                },
-                Transform {
-                    translation: (
-                        rng.random_range(-bounds.x..=bounds.x),
-                        rng.random_range(-bounds.y..=bounds.y),
-                        0.0,
-                    )
-                        .into(),
-                    rotation: Quat::from_axis_angle(Vec3::Z, angle),
-                    ..Default::default()
-                },
-            ))
-            .id();
-        boid_entities.entities.push(entity);
-    }
-    let selected_entity = commands
-        .spawn((
+        commands.spawn((
             Boid {
-                speed: 0.0,
-                angle: 0.0,
+                speed: boid_configuration.speed,
+                angle,
             },
             Sprite {
-                image: boid_sprite.galaga_ship_handle.clone(),
+                image: boid_sprite.fireball_handle.clone(),
                 custom_size: Some(boid_sprite.size),
                 ..Default::default()
             },
-            Transform::from_xyz(0.0, 0.0, 1.0),
-            BoidTestingUnit,
-        ))
-        .id();
-    boid_entities.entities.push(selected_entity);
+            Transform {
+                translation: (
+                    rng.random_range(-bounds.x..=bounds.x),
+                    rng.random_range(-bounds.y..=bounds.y),
+                    0.0,
+                )
+                    .into(),
+                rotation: Quat::from_axis_angle(Vec3::Z, angle),
+                ..Default::default()
+            },
+        ));
+    }
+    commands.spawn((
+        Boid {
+            speed: 0.0,
+            angle: 0.0,
+        },
+        Sprite {
+            image: boid_sprite.galaga_ship_handle.clone(),
+            custom_size: Some(boid_sprite.size),
+            ..Default::default()
+        },
+        Transform::from_xyz(0.0, 0.0, 1.0),
+        BoidTestingUnit,
+    ));
 }
 
 pub fn update_boids(

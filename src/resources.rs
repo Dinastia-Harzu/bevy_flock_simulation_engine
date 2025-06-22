@@ -28,9 +28,3 @@ pub struct BoidSprite {
     pub galaga_ship_handle: Handle<Image>,
     pub size: Vec2,
 }
-
-#[derive(Resource)]
-pub struct BoidEntities {
-    pub entities: Vec<Entity>,
-    pub current_id: usize,
-}
