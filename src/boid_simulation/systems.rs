@@ -20,30 +20,22 @@ pub fn spawn_boids(
     for _ in 0..BoidConfiguration::MAX_BOIDS {
         let angle = rng.random_range(-pi..=pi) - f32::consts::FRAC_PI_2;
         commands.spawn((
-            Boid {
-                speed: boid_configuration.speed,
-                angle,
-            },
+            Boid::new(boid_configuration.speed, angle),
             Sprite::from_image(image_assets.fireball.clone()),
-            Transform {
-                translation: (
+            Transform::from_scale(Vec3::ONE)
+                .with_rotation(Quat::from_axis_angle(Vec3::Z, angle))
+                .with_translation(Vec3::new(
                     rng.random_range(-bounds.x..=bounds.x),
                     rng.random_range(-bounds.y..=bounds.y),
                     0.0,
-                )
-                    .into(),
-                rotation: Quat::from_axis_angle(Vec3::Z, angle),
-                ..Default::default()
-            },
+                )),
         ));
     }
     commands.spawn((
-        Boid {
-            speed: 0.0,
-            angle: 0.0,
-        },
+        Name::from("Boid objetivo"),
+        Boid::default(),
         Sprite::from_image(image_assets.galaga_ship.clone()),
-        Transform::from_xyz(0.0, 0.0, 1.0),
+        Transform::from_scale(Vec3::ONE).with_translation(Vec3::Z),
         BoidTestingUnit,
     ));
 }

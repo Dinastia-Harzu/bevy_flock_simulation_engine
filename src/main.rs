@@ -27,7 +27,8 @@ fn main() {
             enable_multipass_for_primary_context: true,
         })
         .add_plugins(DefaultInspectorConfigPlugin)
-        .add_plugins((AssetsPlugin, BoidSimulationPlugin))
+        .add_plugins(AssetsPlugin)
+        .add_plugins(BoidSimulationPlugin)
         .init_state::<AppState>()
         .insert_resource(ClearColor(Color::srgba(0.0, 0.0, 0.0, 1.0)))
         .insert_resource(Time::<Fixed>::from_hz(60.0))
