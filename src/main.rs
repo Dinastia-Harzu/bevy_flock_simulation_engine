@@ -1,13 +1,16 @@
+mod asset_related;
+mod boid_simulation;
 mod components;
 mod constants;
 mod resources;
 mod states;
 mod systems;
 
-use self::{constants::*, systems::*};
+use self::{boid_simulation::BoidSimulationPlugin, constants::*, states::*, systems::*};
+use asset_related::AssetsPlugin;
 use bevy::prelude::*;
 use bevy_egui::{EguiContextPass, EguiPlugin};
-use states::AppState;
+use bevy_inspector_egui::DefaultInspectorConfigPlugin;
 
 fn main() {
     App::new()
@@ -23,14 +26,13 @@ fn main() {
         .add_plugins(EguiPlugin {
             enable_multipass_for_primary_context: true,
         })
-        .add_plugins(bevy_inspector_egui::DefaultInspectorConfigPlugin)
+        .add_plugins(DefaultInspectorConfigPlugin)
+        .add_plugins((AssetsPlugin, BoidSimulationPlugin))
         .init_state::<AppState>()
         .insert_resource(ClearColor(Color::srgba(0.0, 0.0, 0.0, 1.0)))
         .insert_resource(Time::<Fixed>::from_hz(60.0))
-        .add_systems(Startup, (setup, spawn_boids).chain())
-        .add_systems(FixedUpdate, (update_boids, wrap_edges).chain())
+        .add_systems(Startup, setup)
         .add_systems(Update, common_input)
-        .add_systems(PostUpdate, (update_debug_boid).chain())
         .add_systems(EguiContextPass, inspector_ui)
         .add_systems(OnEnter(AppState::Finished), exit)
         .run();
