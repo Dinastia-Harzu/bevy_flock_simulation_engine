@@ -1,6 +1,6 @@
-mod components;
-mod resources;
-mod systems;
+pub(crate) mod components;
+pub(crate) mod resources;
+pub(crate) mod systems;
 
 use self::{resources::*, systems::*};
 use crate::states::*;

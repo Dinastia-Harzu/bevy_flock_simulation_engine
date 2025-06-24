@@ -2,15 +2,16 @@ mod asset_related;
 mod boid_simulation;
 mod components;
 mod constants;
+mod inspector;
 mod resources;
 mod states;
 mod systems;
 
-use self::{boid_simulation::BoidSimulationPlugin, constants::*, states::*, systems::*};
+use self::{
+    boid_simulation::BoidSimulationPlugin, constants::*, inspector::*, states::*, systems::*,
+};
 use asset_related::AssetsPlugin;
 use bevy::prelude::*;
-use bevy_egui::{EguiContextPass, EguiPlugin};
-use bevy_inspector_egui::DefaultInspectorConfigPlugin;
 
 fn main() {
     App::new()
@@ -23,10 +24,7 @@ fn main() {
             }),
             ..Default::default()
         }))
-        .add_plugins(EguiPlugin {
-            enable_multipass_for_primary_context: true,
-        })
-        .add_plugins(DefaultInspectorConfigPlugin)
+        .add_plugins(InspectorPlugin)
         .add_plugins(AssetsPlugin)
         .add_plugins(BoidSimulationPlugin)
         .init_state::<AppState>()
@@ -34,7 +32,6 @@ fn main() {
         .insert_resource(Time::<Fixed>::from_hz(60.0))
         .add_systems(Startup, setup)
         .add_systems(Update, common_input)
-        .add_systems(EguiContextPass, inspector_ui)
         .add_systems(OnEnter(AppState::Finished), exit)
         .run();
 }
