@@ -1,6 +1,7 @@
 use bevy::prelude::*;
 
-#[derive(Component, Clone, Copy, Default)]
+#[derive(Component, Clone, Copy, Default, Reflect)]
+#[reflect(Component)]
 pub struct Boid {
     pub speed: f32,
     pub angle: f32,
@@ -16,5 +17,20 @@ impl Boid {
     }
 }
 
-#[derive(Component, Clone, Copy)]
-pub struct BoidTestingUnit;
+#[derive(Component, Clone, Copy, Reflect)]
+#[reflect(Component)]
+pub struct BoidTestingUnit {
+    pub follow_boids: bool,
+}
+
+impl BoidTestingUnit {
+    fn new(follow_boids: bool) -> Self {
+        Self { follow_boids }
+    }
+}
+
+impl Default for BoidTestingUnit {
+    fn default() -> Self {
+        Self::new(true)
+    }
+}
