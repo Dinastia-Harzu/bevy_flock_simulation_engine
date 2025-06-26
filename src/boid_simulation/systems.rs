@@ -12,45 +12,77 @@ use std::collections::HashMap;
 pub fn spawn_boids(
     mut commands: Commands,
     boid_configuration: Res<BoidConfiguration>,
+    mut spatial_grid: ResMut<SpatialGrid>,
     image_assets: Res<ImageAssets>,
 ) {
     let mut rng = rand::rng();
     let pi = f32::consts::PI;
-    let bounds = SCREEN_SIZE / 2.0;
+    let bounds = spatial_grid.grid_size() / 2.0;
+    let scale = Vec3::ONE;
     for _ in 0..BoidConfiguration::MAX_BOIDS {
         let angle = rng.random_range(-pi..=pi) - f32::consts::FRAC_PI_2;
-        commands.spawn((
-            Name::from("Boid"),
-            Boid::new(boid_configuration.speed, angle),
-            Sprite::from_image(image_assets.normal_boid_sprite.clone()),
-            Transform::from_scale(Vec3::ONE)
-                .with_rotation(Quat::from_axis_angle(Vec3::Z, angle))
-                .with_translation(Vec3::new(
-                    rng.random_range(-bounds.x..=bounds.x),
-                    rng.random_range(-bounds.y..=bounds.y),
-                    0.0,
-                )),
-        ));
+        let transform = Transform::from_scale(scale)
+            .with_rotation(Quat::from_axis_angle(Vec3::Z, angle))
+            .with_translation(Vec3::new(
+                rng.random_range(-bounds..=bounds),
+                rng.random_range(-bounds..=bounds),
+                0.0,
+            ));
+        let boid = Boid::new(boid_configuration.speed, angle);
+        let boid_entity = commands
+            .spawn((
+                Name::from("Boid"),
+                boid,
+                Sprite::from_image(image_assets.normal_boid_sprite.clone()),
+                transform,
+            ))
+            .id();
+        spatial_grid
+            .at_world_position_mut(transform.translation.xy())
+            .push(SpatialGridBoid::new(boid_entity, boid.velocity()));
     }
     commands.spawn((
         Name::from("Boid objetivo"),
         Boid::default(),
         Sprite::from_image(image_assets.target_boid_sprite.clone()),
-        Transform::from_scale(Vec3::ONE).with_translation(Vec3::Z),
-        BoidTestingUnit,
+        Transform::from_scale(scale).with_translation(Vec3::Z),
+        BoidTestingUnit::default(),
     ));
 }
 
 pub fn update_boids(
-    mut query: Query<(Entity, &mut Boid, &mut Transform)>,
+    mut boids: Query<(
+        Entity,
+        &mut Boid,
+        &mut Transform,
+        Option<&mut BoidTestingUnit>,
+    )>,
+    boid_configuration: Res<BoidConfiguration>,
+    time: Res<Time>,
+) {
+}
+
+pub fn update_boids_OLD(
+    mut query: Query<(
+        Entity,
+        &mut Boid,
+        &mut Transform,
+        Option<&mut BoidTestingUnit>,
+    )>,
     boid_configuration: Res<BoidConfiguration>,
     time: Res<Time>,
 ) {
     let mut steerings = HashMap::new();
     let mut combinations = query.iter_combinations();
-    while let Some([(entity1, boid1, transform1), (entity2, boid2, transform2)]) =
-        combinations.next()
+    while let Some(
+        [(entity1, boid1, transform1, testing_unit1), (entity2, boid2, transform2, testing_unit2)],
+    ) = combinations.next()
     {
+        if testing_unit1.is_some_and(|testing_unit1| !testing_unit1.follow_boids)
+            || testing_unit2.is_some_and(|testing_unit2| !testing_unit2.follow_boids)
+        {
+            continue;
+        }
         let pos1 = transform1.translation.xy();
         let pos2 = transform2.translation.xy();
         let initial_values = (Vec2::ZERO, Vec2::ZERO, Vec2::ZERO, 0.0f32, 0.0f32);
@@ -87,7 +119,7 @@ pub fn update_boids(
             *total_inner2 += 1.0;
         }
     }
-    for (entity, mut boid, mut transform) in &mut query {
+    for (entity, mut boid, mut transform, _testing_unit) in &mut query {
         if let Some((cohesion, separation, alignment, total_outer, total_inner)) =
             steerings.get_mut(&entity)
         {
@@ -156,4 +188,14 @@ pub fn update_debug_boid(
             )
             .resolution(64);
     }
+}
+
+pub fn draw_spatial_grid(spatial_grid: Res<SpatialGrid>, mut gizmos: Gizmos) {
+    let cell_size = spatial_grid.cell_size();
+    gizmos.grid_2d(
+        Isometry2d::IDENTITY,
+        (spatial_grid.columns(), spatial_grid.rows()).into(),
+        (cell_size, cell_size).into(),
+        WHITE,
+    );
 }
