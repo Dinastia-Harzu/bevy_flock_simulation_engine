@@ -37,15 +37,15 @@ impl SpatialGridBoid {
 #[derive(Reflect)]
 pub struct SpatialGridCell {
     grid_pos: UVec2,
-    size: f32,
+    rect: Rect,
     boids: Vec<SpatialGridBoid>,
 }
 
 impl SpatialGridCell {
-    fn new(row: u32, column: u32, size: f32) -> Self {
+    fn new(row: u32, column: u32, size: f32, centre: Vec2) -> Self {
         Self {
             grid_pos: (row, column).into(),
-            size,
+            rect: Rect::from_center_size(centre, Vec2::new(size, size)),
             boids: Vec::with_capacity(BoidConfiguration::MAX_BOIDS as usize),
         }
     }
@@ -53,12 +53,22 @@ impl SpatialGridCell {
     pub fn push(&mut self, boid: SpatialGridBoid) {
         self.boids.push(boid);
     }
+
+    pub fn size(&self) -> f32 {
+        self.rect.size().x
+    }
+
+    pub fn location(&self) -> Vec2 {
+        self.rect.center()
+    }
 }
+
+type Cells = Vec<SpatialGridCell>;
 
 #[derive(Resource, Reflect, InspectorOptions)]
 #[reflect(Resource, InspectorOptions)]
 pub struct SpatialGrid {
-    cells: Vec<SpatialGridCell>,
+    cells: Cells,
     rows: u32,
     columns: u32,
 }
@@ -70,9 +80,15 @@ impl SpatialGrid {
             "Prohibido crear un SpatialGrid unidimensional o nildimensional"
         );
         let mut cells = Vec::new();
+        let offset = Vec2::new((columns - 1) as f32, (rows - 1) as f32) / 2.0;
         for r in 0..rows {
             for c in 0..columns {
-                cells.push(SpatialGridCell::new(r, c, cell_size));
+                cells.push(SpatialGridCell::new(
+                    r,
+                    c,
+                    cell_size,
+                    (Vec2::new(c as f32, r as f32) - offset) * cell_size,
+                ));
             }
         }
         Self {
@@ -80,6 +96,10 @@ impl SpatialGrid {
             rows,
             columns,
         }
+    }
+
+    pub fn cells(&self) -> &Cells {
+        &self.cells
     }
 
     pub fn columns(&self) -> u32 {
@@ -91,11 +111,11 @@ impl SpatialGrid {
     }
 
     pub fn cell_size(&self) -> f32 {
-        self.at_index(0).size
+        self.at_index(0).size()
     }
 
-    pub fn grid_size(&self) -> f32 {
-        self.cell_size() * self.columns as f32
+    pub fn grid_size(&self) -> Vec2 {
+        UVec2::new(self.columns, self.rows).as_vec2() * self.cell_size()
     }
 
     #[must_use = "No vas a usar este SpatialGridCell?"]
@@ -127,15 +147,14 @@ impl SpatialGrid {
     }
 
     fn index_from_world_position(&self, world_position: Vec2) -> usize {
-        let size = self.grid_size();
-        let half_size = size / 2.0;
-        let grid_range = -half_size..=half_size;
+        let grid_size = self.grid_size();
+        let half_size = grid_size / 2.0;
         assert!(
-            grid_range.contains(&world_position.x) && grid_range.contains(&world_position.y),
+            (-half_size.x..=half_size.x).contains(&world_position.x)
+                && (-half_size.y..=half_size.y).contains(&world_position.y),
             "Esta posición no entra en ninguna celda del SpatialGrid"
         );
-        let UVec2 { x: column, y: row } =
-            ((world_position + Vec2::new(half_size, half_size)) / size).as_uvec2();
+        let UVec2 { x: column, y: row } = ((world_position + half_size) / grid_size).as_uvec2();
         (row * self.columns + column) as usize
     }
 }

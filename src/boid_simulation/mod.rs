@@ -11,14 +11,14 @@ pub struct BoidSimulationPlugin;
 impl Plugin for BoidSimulationPlugin {
     fn build(&self, app: &mut App) {
         app.insert_resource(BoidConfiguration {
-            speed: 100.0,
-            inner_perception_radius: 100.0,
-            outer_perception_radius: 500.0,
+            speed: 20.0,
+            inner_perception_radius: 35.0,
+            outer_perception_radius: 100.0,
             separation_factor: 1.0,
             alignment_factor: 1.0,
             cohesion_factor: 1.0,
         })
-        .insert_resource(SpatialGrid::new(5, 8, 200.0))
+        .insert_resource(SpatialGrid::new(5, 7, 200.0))
         .register_type::<Boid>()
         .add_systems(OnEnter(AppState::Next), spawn_boids)
         .add_systems(FixedUpdate, (update_boids, wrap_edges).chain())

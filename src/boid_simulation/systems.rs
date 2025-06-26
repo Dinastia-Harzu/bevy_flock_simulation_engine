@@ -24,8 +24,8 @@ pub fn spawn_boids(
         let transform = Transform::from_scale(scale)
             .with_rotation(Quat::from_axis_angle(Vec3::Z, angle))
             .with_translation(Vec3::new(
-                rng.random_range(-bounds..=bounds),
-                rng.random_range(-bounds..=bounds),
+                rng.random_range(-bounds.x..=bounds.x),
+                rng.random_range(-bounds.y..=bounds.y),
                 0.0,
             ));
         let boid = Boid::new(boid_configuration.speed, angle);
@@ -192,10 +192,14 @@ pub fn update_debug_boid(
 
 pub fn draw_spatial_grid(spatial_grid: Res<SpatialGrid>, mut gizmos: Gizmos) {
     let cell_size = spatial_grid.cell_size();
-    gizmos.grid_2d(
-        Isometry2d::IDENTITY,
-        (spatial_grid.columns(), spatial_grid.rows()).into(),
-        (cell_size, cell_size).into(),
-        WHITE,
-    );
+    // gizmos.grid_2d(
+    //     Isometry2d::IDENTITY,
+    //     (spatial_grid.columns(), spatial_grid.rows()).into(),
+    //     (cell_size, cell_size).into(),
+    //     WHITE,
+    // );
+    for cell in spatial_grid.cells() {
+        gizmos.rect_2d(cell.location(), Vec2::new(cell_size, cell_size), WHITE);
+        gizmos.circle_2d(cell.location(), 1.0, WHITE);
+    }
 }
