@@ -1,5 +1,5 @@
 use super::{components::*, resources::*};
-use crate::{asset_related::resources::*, constants::*};
+use crate::{asset_related::resources::*, constants::*, states::SimulationState};
 use bevy::{
     color::palettes::css::*,
     math::{FloatPow, NormedVectorSpace},
@@ -9,11 +9,18 @@ use core::f32;
 use rand::Rng;
 use std::collections::HashMap;
 
+pub fn clear_simulation(mut commands: Commands, boids: Query<Entity, With<Boid>>) {
+    for entity in boids {
+        commands.entity(entity).despawn();
+    }
+}
+
 pub fn spawn_boids(
     mut commands: Commands,
     boid_configuration: Res<BoidConfiguration>,
     mut spatial_grid: ResMut<SpatialGrid>,
     image_assets: Res<ImageAssets>,
+    mut app_next_state: ResMut<NextState<SimulationState>>,
 ) {
     let mut rng = rand::rng();
     let pi = f32::consts::PI;
@@ -48,6 +55,8 @@ pub fn spawn_boids(
         Transform::from_scale(scale).with_translation(Vec3::Z),
         BoidTestingUnit::default(),
     ));
+
+    app_next_state.set(SimulationState::Running);
 }
 
 pub fn update_boids(

@@ -1,4 +1,7 @@
-use crate::boid_simulation::{components::*, resources::*};
+use crate::{
+    boid_simulation::{components::*, resources::*},
+    states::SimulationState,
+};
 use bevy::prelude::*;
 use bevy_egui::*;
 use bevy_inspector_egui::{bevy_inspector::*, DefaultInspectorConfigPlugin};
@@ -40,6 +43,12 @@ pub fn inspector_ui(world: &mut World) {
             ui.add(egui::Slider::new(&mut selected_boid.speed, 0.0..=500.0));
             ui.drag_angle(&mut selected_boid.angle);
             ui.checkbox(&mut testing_boid.follow_boids, "Seguir demás boids");
+
+            if ui.button("Reiniciar simulación").clicked() {
+                world
+                    .resource_mut::<NextState<SimulationState>>()
+                    .set(SimulationState::Setup);
+            }
         });
     });
 
