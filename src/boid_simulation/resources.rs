@@ -10,6 +10,7 @@ pub struct BoidConfiguration {
     pub separation_factor: f32,
     pub alignment_factor: f32,
     pub cohesion_factor: f32,
+    pub threshold: f32,
 }
 
 impl BoidConfiguration {
@@ -24,8 +25,8 @@ impl BoidConfiguration {
 
 #[derive(Reflect)]
 pub struct SpatialGridBoid {
-    entity: Entity,
-    velocity: Vec2,
+    pub entity: Entity,
+    pub velocity: Vec2,
 }
 
 impl SpatialGridBoid {
@@ -34,11 +35,15 @@ impl SpatialGridBoid {
     }
 }
 
+type CellBoids = Vec<SpatialGridBoid>;
+type Cells = Vec<SpatialGridCell>;
+
 #[derive(Reflect)]
 pub struct SpatialGridCell {
     grid_pos: UVec2,
     rect: Rect,
-    boids: Vec<SpatialGridBoid>,
+    boids: CellBoids,
+    pub grid_square: Entity,
 }
 
 impl SpatialGridCell {
@@ -47,6 +52,7 @@ impl SpatialGridCell {
             grid_pos: (row, column).into(),
             rect: Rect::from_center_size(centre, Vec2::new(size, size)),
             boids: Vec::with_capacity(BoidConfiguration::MAX_BOIDS as usize),
+            grid_square: Entity::PLACEHOLDER,
         }
     }
 
@@ -61,9 +67,15 @@ impl SpatialGridCell {
     pub fn location(&self) -> Vec2 {
         self.rect.center()
     }
-}
 
-type Cells = Vec<SpatialGridCell>;
+    pub fn cell_boids(&self) -> &CellBoids {
+        &self.boids
+    }
+
+    pub fn contains(&self, location: Vec2) -> bool {
+        self.rect.contains(location)
+    }
+}
 
 #[derive(Resource, Reflect, InspectorOptions)]
 #[reflect(Resource, InspectorOptions)]
@@ -102,6 +114,10 @@ impl SpatialGrid {
         &self.cells
     }
 
+    pub fn cells_mut(&mut self) -> &mut Cells {
+        &mut self.cells
+    }
+
     pub fn columns(&self) -> u32 {
         self.columns
     }
@@ -116,6 +132,12 @@ impl SpatialGrid {
 
     pub fn grid_size(&self) -> Vec2 {
         UVec2::new(self.columns, self.rows).as_vec2() * self.cell_size()
+    }
+
+    pub fn clear(&mut self) {
+        for cell in &mut self.cells {
+            cell.boids.clear();
+        }
     }
 
     #[must_use = "No vas a usar este SpatialGridCell?"]
@@ -156,5 +178,26 @@ impl SpatialGrid {
         );
         let UVec2 { x: column, y: row } = ((world_position + half_size) / grid_size).as_uvec2();
         (row * self.columns + column) as usize
+    }
+}
+
+#[derive(Component)]
+pub struct SpatialGridCellSquare;
+
+#[derive(Resource, Reflect, InspectorOptions)]
+#[reflect(Resource, InspectorOptions)]
+pub struct SimulationConfiguration {
+    pub should_draw: bool,
+}
+
+impl SimulationConfiguration {
+    fn new(should_draw: bool) -> Self {
+        Self { should_draw }
+    }
+}
+
+impl Default for SimulationConfiguration {
+    fn default() -> Self {
+        Self::new(true)
     }
 }

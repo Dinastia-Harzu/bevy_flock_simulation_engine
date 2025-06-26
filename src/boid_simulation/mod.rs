@@ -18,16 +18,22 @@ impl Plugin for BoidSimulationPlugin {
                 separation_factor: 1.0,
                 alignment_factor: 1.0,
                 cohesion_factor: 1.0,
+                threshold: 0.001,
             })
             .insert_resource(SpatialGrid::new(5, 7, 200.0))
+            .insert_resource(SimulationConfiguration::default())
             .register_type::<Boid>()
+            .add_systems(PostStartup, init_spatial_grid)
             .add_systems(
                 PreUpdate,
                 (clear_simulation, spawn_boids)
                     .chain()
                     .run_if(in_state(SimulationState::Setup).and(in_state(AppState::Running))),
             )
-            .add_systems(FixedUpdate, (update_boids, wrap_edges).chain())
+            .add_systems(
+                FixedUpdate,
+                (update_spatial_grid, update_boids, wrap_edges).chain(),
+            )
             .add_systems(PostUpdate, (update_debug_boid, draw_spatial_grid));
     }
 }

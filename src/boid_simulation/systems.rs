@@ -1,5 +1,5 @@
 use super::{components::*, resources::*};
-use crate::{asset_related::resources::*, constants::*, states::SimulationState};
+use crate::{asset_related::resources::*, states::*};
 use bevy::{
     color::palettes::css::*,
     math::{FloatPow, NormedVectorSpace},
@@ -8,6 +8,19 @@ use bevy::{
 use core::f32;
 use rand::Rng;
 use std::collections::HashMap;
+
+pub fn init_spatial_grid(mut commands: Commands, mut spatial_grid: ResMut<SpatialGrid>) {
+    let cell_size = spatial_grid.cell_size();
+    for cell in spatial_grid.cells_mut() {
+        cell.grid_square = commands
+            .spawn((
+                SpatialGridCellSquare,
+                Sprite::from_color(Color::srgba(1.0, 1.0, 1.0, 0.0), Vec2::splat(cell_size)),
+                Transform::from_translation(cell.location().extend(-1.0)),
+            ))
+            .id();
+    }
+}
 
 pub fn clear_simulation(mut commands: Commands, boids: Query<Entity, With<Boid>>) {
     for entity in boids {
@@ -40,7 +53,11 @@ pub fn spawn_boids(
             .spawn((
                 Name::from("Boid"),
                 boid,
-                Sprite::from_image(image_assets.normal_boid_sprite.clone()),
+                Sprite {
+                    image: image_assets.boid_sprite.clone(),
+                    color: Color::srgb(1.0, 0.2, 0.2),
+                    ..default()
+                },
                 transform,
             ))
             .id();
@@ -51,12 +68,28 @@ pub fn spawn_boids(
     commands.spawn((
         Name::from("Boid objetivo"),
         Boid::default(),
-        Sprite::from_image(image_assets.target_boid_sprite.clone()),
+        Sprite {
+            image: image_assets.boid_sprite.clone(),
+            color: Color::srgb(0.1, 0.1, 1.0),
+            ..default()
+        },
         Transform::from_scale(scale).with_translation(Vec3::Z),
         BoidTestingUnit::default(),
     ));
 
     app_next_state.set(SimulationState::Running);
+}
+
+pub fn update_spatial_grid(
+    boids: Query<(Entity, &Transform, &Boid)>,
+    mut spatial_grid: ResMut<SpatialGrid>,
+) {
+    spatial_grid.clear();
+    for (entity, transform, boid) in boids {
+        spatial_grid
+            .at_world_position_mut(transform.translation.xy())
+            .push(SpatialGridBoid::new(entity, boid.velocity()));
+    }
 }
 
 pub fn update_boids(
@@ -67,8 +100,35 @@ pub fn update_boids(
         Option<&mut BoidTestingUnit>,
     )>,
     boid_configuration: Res<BoidConfiguration>,
+    spatial_grid: Res<SpatialGrid>,
     time: Res<Time>,
 ) {
+    for (entity, mut boid, mut transform, testing_unit) in boids {
+        let mut average_velocity = Vec2::ZERO;
+        let mut nearby_boids = 0;
+        for cell_boid in spatial_grid
+            .at_world_position(transform.translation.xy())
+            .cell_boids()
+            .iter()
+            .filter(|cell_boid| cell_boid.entity != entity)
+        {
+            average_velocity += cell_boid.velocity;
+            nearby_boids += 1;
+        }
+        if nearby_boids > 1 {
+            average_velocity /= nearby_boids as f32;
+            if average_velocity.length_squared() > boid_configuration.threshold {
+                let current_dir = boid.velocity().normalize_or_zero();
+                let force_direction = average_velocity.normalize_or_zero();
+                let new_dir = current_dir.lerp(force_direction, 0.03).normalize_or_zero();
+                let new_velocity = new_dir * boid.velocity().length();
+                boid.speed = new_velocity.length();
+                boid.angle = new_velocity.to_angle();
+            }
+        }
+        transform.translation += boid.velocity().extend(0.0) * time.delta_secs();
+        transform.rotation = Quat::from_axis_angle(Vec3::Z, boid.angle);
+    }
 }
 
 pub fn update_boids_OLD(
@@ -158,57 +218,80 @@ pub fn update_boids_OLD(
     }
 }
 
-pub fn wrap_edges(mut query: Query<&mut Transform, With<Boid>>) {
-    for mut transform in &mut query {
-        let position = &mut transform.translation;
-        let Vec2 { x: bx, y: by } = SCREEN_SIZE / 2.0;
-        if position.x > bx {
-            position.x = -bx;
-        } else if position.x < -bx {
-            position.x = bx;
+pub fn wrap_edges(boids: Query<&mut Transform, With<Boid>>, spatial_grid: Res<SpatialGrid>) {
+    for mut transform in boids {
+        let Vec2 { x: bx, y: by } = spatial_grid.grid_size() / 2.0;
+        let Vec3 { x, y, .. } = &mut transform.translation;
+        if *x > bx {
+            *x = -bx;
+        } else if *x < -bx {
+            *x = bx;
         }
-        if position.y > by {
-            position.y = -by;
-        } else if position.y < -by {
-            position.y = by;
+        if *y > by {
+            *y = -by;
+        } else if *y < -by {
+            *y = by;
         }
     }
 }
 
 pub fn update_debug_boid(
-    boid_query: Option<Single<&Transform, With<BoidTestingUnit>>>,
+    testing_unit_boid: Option<Single<(&Transform, &mut Sprite), With<BoidTestingUnit>>>,
     boid_configuration: Res<BoidConfiguration>,
+    simulation_configuration: Res<SimulationConfiguration>,
     mut gizmos: Gizmos,
 ) {
-    if let Some(boid) = boid_query {
-        let transform = boid.into_inner();
+    if !simulation_configuration.should_draw {
+        return;
+    }
+
+    if let Some(boid) = testing_unit_boid {
+        let (transform, mut sprite) = boid.into_inner();
+        let position = transform.translation.xy();
+        sprite.color = Color::srgb(0.3, 0.3, 1.0);
         gizmos
-            .circle_2d(
-                transform.translation.xy(),
-                boid_configuration.inner_perception_radius,
-                RED,
-            )
+            .circle_2d(position, boid_configuration.inner_perception_radius, RED)
             .resolution(64);
         gizmos
-            .circle_2d(
-                transform.translation.xy(),
-                boid_configuration.outer_perception_radius,
-                GREEN,
-            )
+            .circle_2d(position, boid_configuration.outer_perception_radius, GREEN)
             .resolution(64);
     }
 }
 
-pub fn draw_spatial_grid(spatial_grid: Res<SpatialGrid>, mut gizmos: Gizmos) {
+pub fn draw_spatial_grid(
+    boids: Query<(Entity, &Transform), (With<Boid>, Without<BoidTestingUnit>)>,
+    boid_testing_unit: Option<Single<&Transform, With<BoidTestingUnit>>>,
+    mut grid_squares: Query<&mut Sprite, With<SpatialGridCellSquare>>,
+    mut spatial_grid: ResMut<SpatialGrid>,
+    simulation_configuration: Res<SimulationConfiguration>,
+    mut gizmos: Gizmos,
+) {
+    if !simulation_configuration.should_draw {
+        return;
+    }
+
+    if let Some(boid_testing_unit) = boid_testing_unit {
+        let location = boid_testing_unit.into_inner().translation.xy();
+        for cell in spatial_grid.cells_mut() {
+            let Ok(mut grid_square_sprite) = grid_squares.get_mut(cell.grid_square) else {
+                return;
+            };
+            grid_square_sprite
+                .color
+                .set_alpha(if cell.contains(location) {
+                    0.01
+                } else {
+                    0.0
+                });
+        }
+    }
+
+    // for (entity, boid_testing_unit) in boids {
+    //     if let Some(boid_testing_unit) = boid_testing_unit {}
+    // }
+
     let cell_size = spatial_grid.cell_size();
-    // gizmos.grid_2d(
-    //     Isometry2d::IDENTITY,
-    //     (spatial_grid.columns(), spatial_grid.rows()).into(),
-    //     (cell_size, cell_size).into(),
-    //     WHITE,
-    // );
     for cell in spatial_grid.cells() {
         gizmos.rect_2d(cell.location(), Vec2::new(cell_size, cell_size), WHITE);
-        gizmos.circle_2d(cell.location(), 1.0, WHITE);
     }
 }

@@ -49,6 +49,11 @@ pub fn inspector_ui(world: &mut World) {
                     .resource_mut::<NextState<SimulationState>>()
                     .set(SimulationState::Setup);
             }
+
+            ui.checkbox(
+                &mut world.resource_mut::<SimulationConfiguration>().should_draw,
+                "Dibujar cosas para depurar",
+            );
         });
     });
 
