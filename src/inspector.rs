@@ -25,20 +25,24 @@ pub fn inspector_ui(world: &mut World) {
     };
     let mut egui_context = egui_context.clone();
 
-    egui::Window::new("Configuración de los Boids").show(egui_context.get_mut(), |ui| {
+    egui::Window::new("Boids Config").show(egui_context.get_mut(), |ui| {
         egui::ScrollArea::vertical().show(ui, |ui| {
+            ui.heading("Configuración de los boids");
             ui_for_resource::<BoidConfiguration>(world, ui);
-            let Ok(mut testing_unit_boid_transform) = world
-                .query_filtered::<&mut Transform, With<BoidTestingUnit>>()
+            let Ok((mut selected_boid, mut testing_boid)) = world
+                .query::<(&mut Boid, &mut BoidTestingUnit)>()
                 .single_mut(world)
             else {
                 return;
             };
-            let mut new_rotation = testing_unit_boid_transform.rotation.to_axis_angle().1;
-            ui.drag_angle(&mut new_rotation);
-            testing_unit_boid_transform.rotation = Quat::from_axis_angle(Vec3::Z, new_rotation);
+            ui.separator();
+            ui.heading("Boid seleccionado");
+            ui.add(egui::Slider::new(&mut selected_boid.speed, 0.0..=500.0));
+            ui.drag_angle(&mut selected_boid.angle);
+            ui.checkbox(&mut testing_boid.follow_boids, "Seguir demás boids");
         });
     });
+
     egui::Window::new("Boids").show(egui_context.get_mut(), |ui| {
         egui::ScrollArea::vertical().show(ui, |ui| {
             ui_for_entities_filtered::<Filter<With<Boid>>>(world, ui, true, &Filter::all());
