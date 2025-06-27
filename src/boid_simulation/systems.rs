@@ -9,19 +9,6 @@ use core::f32;
 use rand::Rng;
 use std::collections::HashMap;
 
-pub fn init_spatial_grid(mut commands: Commands, mut spatial_grid: ResMut<SpatialGrid>) {
-    let cell_size = spatial_grid.cell_size();
-    for cell in spatial_grid.cells_mut() {
-        cell.grid_square = commands
-            .spawn((
-                SpatialGridCellSquare,
-                Sprite::from_color(Color::srgba(1.0, 1.0, 1.0, 0.0), Vec2::splat(cell_size)),
-                Transform::from_translation(cell.location().extend(-1.0)),
-            ))
-            .id();
-    }
-}
-
 pub fn clear_simulation(mut commands: Commands, boids: Query<Entity, With<Boid>>) {
     for entity in boids {
         commands.entity(entity).despawn();
@@ -93,7 +80,7 @@ pub fn update_spatial_grid(
 }
 
 pub fn update_boids(
-    mut boids: Query<(
+    boids: Query<(
         Entity,
         &mut Boid,
         &mut Transform,
@@ -131,92 +118,92 @@ pub fn update_boids(
     }
 }
 
-pub fn update_boids_OLD(
-    mut query: Query<(
-        Entity,
-        &mut Boid,
-        &mut Transform,
-        Option<&mut BoidTestingUnit>,
-    )>,
-    boid_configuration: Res<BoidConfiguration>,
-    time: Res<Time>,
-) {
-    let mut steerings = HashMap::new();
-    let mut combinations = query.iter_combinations();
-    while let Some(
-        [(entity1, boid1, transform1, testing_unit1), (entity2, boid2, transform2, testing_unit2)],
-    ) = combinations.next()
-    {
-        if testing_unit1.is_some_and(|testing_unit1| !testing_unit1.follow_boids)
-            || testing_unit2.is_some_and(|testing_unit2| !testing_unit2.follow_boids)
-        {
-            continue;
-        }
-        let pos1 = transform1.translation.xy();
-        let pos2 = transform2.translation.xy();
-        let initial_values = (Vec2::ZERO, Vec2::ZERO, Vec2::ZERO, 0.0f32, 0.0f32);
-        let pos1_to_pos2_squared = pos1.distance_squared(pos2);
-        let pos1_to_pos2 = pos1.distance(pos2);
-        let in_inner_radius =
-            pos1_to_pos2_squared <= boid_configuration.inner_perception_radius.squared();
-        let in_outer_radius =
-            pos1_to_pos2_squared <= boid_configuration.outer_perception_radius.squared();
-
-        let (cohesion1, separation1, alignment1, total_outer1, total_inner1) =
-            steerings.entry(entity1).or_insert(initial_values);
-        if in_outer_radius {
-            *cohesion1 += pos2;
-            *alignment1 += boid2.velocity();
-            *total_outer1 += 1.0;
-        }
-        if in_inner_radius {
-            let other_to_current = pos1 - pos2;
-            *separation1 += other_to_current / pos1_to_pos2;
-            *total_inner1 += 1.0;
-        }
-
-        let (cohesion2, separation2, alignment2, total_outer2, total_inner2) =
-            steerings.entry(entity2).or_insert(initial_values);
-        if in_outer_radius {
-            *cohesion2 += pos1;
-            *alignment2 += boid1.velocity();
-            *total_outer2 += 1.0;
-        }
-        if in_inner_radius {
-            let other_to_current = pos2 - pos1;
-            *separation2 += other_to_current / pos1_to_pos2;
-            *total_inner2 += 1.0;
-        }
-    }
-    for (entity, mut boid, mut transform, _testing_unit) in &mut query {
-        if let Some((cohesion, separation, alignment, total_outer, total_inner)) =
-            steerings.get_mut(&entity)
-        {
-            *cohesion /= *total_outer;
-            *cohesion = (*cohesion - transform.translation.xy()) / 100.0;
-            *cohesion *= boid_configuration.cohesion_factor;
-
-            *separation /= *total_inner;
-            *separation *= boid_configuration.separation_factor;
-
-            *alignment /= *total_outer;
-            *alignment = (*alignment - boid.velocity()) / 8.0;
-            *alignment *= boid_configuration.alignment_factor;
-
-            let mut velocity = boid.velocity();
-            velocity += *cohesion + *alignment + *separation;
-            // velocity += *cohesion + *alignment;
-            // velocity += *separation;
-            velocity =
-                velocity.normalize_or(Vec2::from_angle(boid.angle)) * boid_configuration.speed;
-
-            boid.speed = velocity.norm();
-            boid.angle = velocity.to_angle();
-            transform.translation += (velocity * time.delta_secs()).extend(0.0);
-            transform.rotation = Quat::from_axis_angle(Vec3::Z, boid.angle);
-        }
-    }
-}
+// pub fn update_boids_OLD(
+//     mut query: Query<(
+//         Entity,
+//         &mut Boid,
+//         &mut Transform,
+//         Option<&mut BoidTestingUnit>,
+//     )>,
+//     boid_configuration: Res<BoidConfiguration>,
+//     time: Res<Time>,
+// ) {
+//     let mut steerings = HashMap::new();
+//     let mut combinations = query.iter_combinations();
+//     while let Some(
+//         [(entity1, boid1, transform1, testing_unit1), (entity2, boid2, transform2, testing_unit2)],
+//     ) = combinations.next()
+//     {
+//         if testing_unit1.is_some_and(|testing_unit1| !testing_unit1.follow_boids)
+//             || testing_unit2.is_some_and(|testing_unit2| !testing_unit2.follow_boids)
+//         {
+//             continue;
+//         }
+//         let pos1 = transform1.translation.xy();
+//         let pos2 = transform2.translation.xy();
+//         let initial_values = (Vec2::ZERO, Vec2::ZERO, Vec2::ZERO, 0.0f32, 0.0f32);
+//         let pos1_to_pos2_squared = pos1.distance_squared(pos2);
+//         let pos1_to_pos2 = pos1.distance(pos2);
+//         let in_inner_radius =
+//             pos1_to_pos2_squared <= boid_configuration.inner_perception_radius.squared();
+//         let in_outer_radius =
+//             pos1_to_pos2_squared <= boid_configuration.outer_perception_radius.squared();
+//
+//         let (cohesion1, separation1, alignment1, total_outer1, total_inner1) =
+//             steerings.entry(entity1).or_insert(initial_values);
+//         if in_outer_radius {
+//             *cohesion1 += pos2;
+//             *alignment1 += boid2.velocity();
+//             *total_outer1 += 1.0;
+//         }
+//         if in_inner_radius {
+//             let other_to_current = pos1 - pos2;
+//             *separation1 += other_to_current / pos1_to_pos2;
+//             *total_inner1 += 1.0;
+//         }
+//
+//         let (cohesion2, separation2, alignment2, total_outer2, total_inner2) =
+//             steerings.entry(entity2).or_insert(initial_values);
+//         if in_outer_radius {
+//             *cohesion2 += pos1;
+//             *alignment2 += boid1.velocity();
+//             *total_outer2 += 1.0;
+//         }
+//         if in_inner_radius {
+//             let other_to_current = pos2 - pos1;
+//             *separation2 += other_to_current / pos1_to_pos2;
+//             *total_inner2 += 1.0;
+//         }
+//     }
+//     for (entity, mut boid, mut transform, _testing_unit) in &mut query {
+//         if let Some((cohesion, separation, alignment, total_outer, total_inner)) =
+//             steerings.get_mut(&entity)
+//         {
+//             *cohesion /= *total_outer;
+//             *cohesion = (*cohesion - transform.translation.xy()) / 100.0;
+//             *cohesion *= boid_configuration.cohesion_factor;
+//
+//             *separation /= *total_inner;
+//             *separation *= boid_configuration.separation_factor;
+//
+//             *alignment /= *total_outer;
+//             *alignment = (*alignment - boid.velocity()) / 8.0;
+//             *alignment *= boid_configuration.alignment_factor;
+//
+//             let mut velocity = boid.velocity();
+//             velocity += *cohesion + *alignment + *separation;
+//             // velocity += *cohesion + *alignment;
+//             // velocity += *separation;
+//             velocity =
+//                 velocity.normalize_or(Vec2::from_angle(boid.angle)) * boid_configuration.speed;
+//
+//             boid.speed = velocity.norm();
+//             boid.angle = velocity.to_angle();
+//             transform.translation += (velocity * time.delta_secs()).extend(0.0);
+//             transform.rotation = Quat::from_axis_angle(Vec3::Z, boid.angle);
+//         }
+//     }
+// }
 
 pub fn wrap_edges(boids: Query<&mut Transform, With<Boid>>, spatial_grid: Res<SpatialGrid>) {
     for mut transform in boids {
@@ -259,36 +246,13 @@ pub fn update_debug_boid(
 }
 
 pub fn draw_spatial_grid(
-    boids: Query<(Entity, &Transform), (With<Boid>, Without<BoidTestingUnit>)>,
-    boid_testing_unit: Option<Single<&Transform, With<BoidTestingUnit>>>,
-    mut grid_squares: Query<&mut Sprite, With<SpatialGridCellSquare>>,
-    mut spatial_grid: ResMut<SpatialGrid>,
+    spatial_grid: Res<SpatialGrid>,
     simulation_configuration: Res<SimulationConfiguration>,
     mut gizmos: Gizmos,
 ) {
     if !simulation_configuration.should_draw {
         return;
     }
-
-    if let Some(boid_testing_unit) = boid_testing_unit {
-        let location = boid_testing_unit.into_inner().translation.xy();
-        for cell in spatial_grid.cells_mut() {
-            let Ok(mut grid_square_sprite) = grid_squares.get_mut(cell.grid_square) else {
-                return;
-            };
-            grid_square_sprite
-                .color
-                .set_alpha(if cell.contains(location) {
-                    0.01
-                } else {
-                    0.0
-                });
-        }
-    }
-
-    // for (entity, boid_testing_unit) in boids {
-    //     if let Some(boid_testing_unit) = boid_testing_unit {}
-    // }
 
     let cell_size = spatial_grid.cell_size();
     for cell in spatial_grid.cells() {

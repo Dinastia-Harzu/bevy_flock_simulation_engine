@@ -23,7 +23,6 @@ impl Plugin for BoidSimulationPlugin {
             .insert_resource(SpatialGrid::new(5, 7, 200.0))
             .insert_resource(SimulationConfiguration::default())
             .register_type::<Boid>()
-            .add_systems(PostStartup, init_spatial_grid)
             .add_systems(
                 PreUpdate,
                 (clear_simulation, spawn_boids)

@@ -43,7 +43,6 @@ pub struct SpatialGridCell {
     grid_pos: UVec2,
     rect: Rect,
     boids: CellBoids,
-    pub grid_square: Entity,
 }
 
 impl SpatialGridCell {
@@ -52,7 +51,6 @@ impl SpatialGridCell {
             grid_pos: (row, column).into(),
             rect: Rect::from_center_size(centre, Vec2::new(size, size)),
             boids: Vec::with_capacity(BoidConfiguration::MAX_BOIDS as usize),
-            grid_square: Entity::PLACEHOLDER,
         }
     }
 
@@ -180,9 +178,6 @@ impl SpatialGrid {
         (row * self.columns + column) as usize
     }
 }
-
-#[derive(Component)]
-pub struct SpatialGridCellSquare;
 
 #[derive(Resource, Reflect, InspectorOptions)]
 #[reflect(Resource, InspectorOptions)]
