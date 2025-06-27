@@ -91,26 +91,30 @@ pub fn update_boids(
     time: Res<Time>,
 ) {
     for (entity, mut boid, mut transform, testing_unit) in boids {
-        let mut average_velocity = Vec2::ZERO;
-        let mut nearby_boids = 0;
-        for cell_boid in spatial_grid
-            .at_world_position(transform.translation.xy())
-            .cell_boids()
-            .iter()
-            .filter(|cell_boid| cell_boid.entity != entity)
+        if testing_unit.is_none()
+            || testing_unit.is_some_and(|testing_unit| testing_unit.follow_boids)
         {
-            average_velocity += cell_boid.velocity;
-            nearby_boids += 1;
-        }
-        if nearby_boids > 1 {
-            average_velocity /= nearby_boids as f32;
-            if average_velocity.length_squared() > boid_configuration.threshold {
-                let current_dir = boid.velocity().normalize_or_zero();
-                let force_direction = average_velocity.normalize_or_zero();
-                let new_dir = current_dir.lerp(force_direction, 0.03).normalize_or_zero();
-                let new_velocity = new_dir * boid.velocity().length();
-                boid.speed = new_velocity.length();
-                boid.angle = new_velocity.to_angle();
+            let mut average_velocity = Vec2::ZERO;
+            let mut nearby_boids = 0;
+            for cell_boid in spatial_grid
+                .at_world_position(transform.translation.xy())
+                .cell_boids()
+                .iter()
+                .filter(|cell_boid| cell_boid.entity != entity)
+            {
+                average_velocity += cell_boid.velocity;
+                nearby_boids += 1;
+            }
+            if nearby_boids > 1 {
+                average_velocity /= nearby_boids as f32;
+                if average_velocity.length_squared() > boid_configuration.threshold {
+                    let current_dir = boid.velocity().normalize_or_zero();
+                    let force_direction = average_velocity.normalize_or_zero();
+                    let new_dir = current_dir.lerp(force_direction, 0.03).normalize_or_zero();
+                    let new_velocity = new_dir * boid.velocity().length();
+                    boid.speed = new_velocity.length();
+                    boid.angle = new_velocity.to_angle();
+                }
             }
         }
         transform.translation += boid.velocity().extend(0.0) * time.delta_secs();
