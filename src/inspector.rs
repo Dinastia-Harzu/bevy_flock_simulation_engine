@@ -38,11 +38,16 @@ pub fn inspector_ui(world: &mut World) {
             else {
                 return;
             };
+            let follow_boids = &mut testing_boid.follow_boids;
             ui.separator();
             ui.heading("Boid seleccionado");
-            ui.add(egui::Slider::new(&mut selected_boid.speed, 0.0..=500.0));
-            ui.drag_angle(&mut selected_boid.angle);
-            ui.checkbox(&mut testing_boid.follow_boids, "Seguir demás boids");
+            ui.checkbox(follow_boids, "Seguir demás boids");
+            if !*follow_boids {
+                ui.label("Velocidad: ");
+                ui.add(egui::Slider::new(&mut selected_boid.speed, 0.0..=500.0));
+                ui.label("Ángulo: ");
+                ui.drag_angle(&mut selected_boid.angle);
+            }
 
             if ui.button("Reiniciar simulación").clicked() {
                 world
