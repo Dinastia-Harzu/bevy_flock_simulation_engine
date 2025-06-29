@@ -15,7 +15,7 @@ pub struct BoidConfiguration {
 
 impl BoidConfiguration {
     pub const MAX_VEL: f32 = 600.0;
-    pub const MAX_BOIDS: u32 = 100;
+    pub const MAX_BOIDS: u32 = 500;
     pub const MAX_INNER_PERCEPTION_RADIUS: f32 = 500.0;
     pub const MAX_OUTER_PERCEPTION_RADIUS: f32 = 2000.0;
     pub const MAX_SEPARATION_FACTOR: f32 = 10.0;

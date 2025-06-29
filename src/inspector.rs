@@ -32,6 +32,7 @@ pub fn inspector_ui(world: &mut World) {
         egui::ScrollArea::vertical().show(ui, |ui| {
             ui.heading("Configuración de los boids");
             ui_for_resource::<BoidConfiguration>(world, ui);
+
             let Ok((mut selected_boid, mut testing_boid)) = world
                 .query::<(&mut Boid, &mut BoidTestingUnit)>()
                 .single_mut(world)
@@ -49,12 +50,13 @@ pub fn inspector_ui(world: &mut World) {
                 ui.drag_angle(&mut selected_boid.angle);
             }
 
+            ui.separator();
+            ui.heading("Otros");
             if ui.button("Reiniciar simulación").clicked() {
                 world
                     .resource_mut::<NextState<SimulationState>>()
                     .set(SimulationState::Setup);
             }
-
             ui.checkbox(
                 &mut world.resource_mut::<SimulationConfiguration>().should_draw,
                 "Dibujar cosas para depurar",
@@ -62,9 +64,9 @@ pub fn inspector_ui(world: &mut World) {
         });
     });
 
-    egui::Window::new("Boids").show(egui_context.get_mut(), |ui| {
-        egui::ScrollArea::vertical().show(ui, |ui| {
-            ui_for_entities_filtered::<Filter<With<Boid>>>(world, ui, true, &Filter::all());
-        });
-    });
+    // egui::Window::new("Boids").show(egui_context.get_mut(), |ui| {
+    //     egui::ScrollArea::vertical().show(ui, |ui| {
+    //         ui_for_entities_filtered::<Filter<With<Boid>>>(world, ui, true, &Filter::all());
+    //     });
+    // });
 }
