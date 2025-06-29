@@ -15,6 +15,11 @@ impl Boid {
     pub fn velocity(&self) -> Vec2 {
         Vec2::from_angle(self.angle) * self.speed
     }
+
+    pub fn set_velocity(&mut self, velocity: Vec2) {
+        self.speed = velocity.length();
+        self.angle = velocity.to_angle();
+    }
 }
 
 #[derive(Component, Clone, Copy, Reflect)]

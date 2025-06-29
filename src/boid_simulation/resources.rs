@@ -26,12 +26,13 @@ impl BoidConfiguration {
 #[derive(Reflect)]
 pub struct SpatialGridBoid {
     pub entity: Entity,
+    pub position: Vec2,
     pub velocity: Vec2,
 }
 
 impl SpatialGridBoid {
-    pub fn new(entity: Entity, velocity: Vec2) -> Self {
-        Self { entity, velocity }
+    pub fn new(entity: Entity, position: Vec2, velocity: Vec2) -> Self {
+        Self { entity, position, velocity }
     }
 }
 
@@ -158,15 +159,17 @@ impl SpatialGrid {
         self.at_index_mut(self.index_from_world_position(world_position))
     }
 
-    fn at_index(&self, index: usize) -> &SpatialGridCell {
+    #[must_use = "No vas a usar este SpatialGridCell?"]
+    pub fn at_index(&self, index: usize) -> &SpatialGridCell {
         &self.cells[index]
     }
 
-    fn at_index_mut(&mut self, index: usize) -> &mut SpatialGridCell {
+    #[must_use = "No vas a usar este SpatialGridCell?"]
+    pub fn at_index_mut(&mut self, index: usize) -> &mut SpatialGridCell {
         &mut self.cells[index]
     }
 
-    fn index_from_world_position(&self, world_position: Vec2) -> usize {
+    pub fn index_from_world_position(&self, world_position: Vec2) -> usize {
         let grid_size = self.grid_size();
         let half_size = grid_size / 2.0;
         assert!(
@@ -194,5 +197,38 @@ impl SimulationConfiguration {
 impl Default for SimulationConfiguration {
     fn default() -> Self {
         Self::new(true)
+    }
+}
+
+pub struct BoidRuleParametres<'a> {
+    pub entity: Entity,
+    pub position: Vec2,
+    pub velocity: Vec2,
+    pub cell: &'a SpatialGridCell
+}
+
+pub trait Rule: Fn(BoidRuleParametres) -> Vec2 + Send + Sync + 'static {}
+impl<T: Fn(BoidRuleParametres) -> Vec2 + Send + Sync + 'static> Rule for T {}
+
+#[derive(Resource, Default)]
+pub struct BoidRules(Vec<Box<dyn Rule>>);
+
+impl BoidRules {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn add(&mut self, rule: impl Rule) -> &mut Self {
+        self.0.push(Box::new(rule));
+        self
+    }
+}
+
+impl<'a> IntoIterator for &'a BoidRules {
+    type Item = &'a Box<dyn Rule>;
+    type IntoIter = std::slice::Iter<'a, Box<dyn Rule>>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.0.iter()
     }
 }

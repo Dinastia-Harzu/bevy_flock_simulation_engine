@@ -48,9 +48,10 @@ pub fn spawn_boids(
                 transform,
             ))
             .id();
+        let position = transform.translation.xy();
         spatial_grid
-            .at_world_position_mut(transform.translation.xy())
-            .push(SpatialGridBoid::new(boid_entity, boid.velocity()));
+            .at_world_position_mut(position)
+            .push(SpatialGridBoid::new(boid_entity, position, boid.velocity()));
     }
     commands.spawn((
         Name::from("Boid objetivo"),
@@ -73,11 +74,21 @@ pub fn update_spatial_grid(
 ) {
     spatial_grid.clear();
     for (entity, transform, boid) in boids {
+        let position = transform.translation.xy();
         spatial_grid
-            .at_world_position_mut(transform.translation.xy())
-            .push(SpatialGridBoid::new(entity, boid.velocity()));
+            .at_world_position_mut(position)
+            .push(SpatialGridBoid::new(entity, position, boid.velocity()));
     }
 }
+
+// pub fn apply_rules(mut commands: Commands, boids: Query<(Entity, &Transform, &Boid)>) {
+//     for (entity, transform, boid) in boids {
+//         commands.trigger_targets(
+//             ApplyRules::new(transform.translation.xy(), boid.velocity()),
+//             entity,
+//         );
+//     }
+// }
 
 pub fn update_boids(
     boids: Query<(
@@ -88,34 +99,46 @@ pub fn update_boids(
     )>,
     boid_configuration: Res<BoidConfiguration>,
     spatial_grid: Res<SpatialGrid>,
+    rules: Res<BoidRules>,
     time: Res<Time>,
 ) {
     for (entity, mut boid, mut transform, testing_unit) in boids {
         if testing_unit.is_none()
             || testing_unit.is_some_and(|testing_unit| testing_unit.follow_boids)
         {
-            let mut average_velocity = Vec2::ZERO;
-            let mut nearby_boids = 0;
-            for cell_boid in spatial_grid
-                .at_world_position(transform.translation.xy())
-                .cell_boids()
-                .iter()
-                .filter(|cell_boid| cell_boid.entity != entity)
-            {
-                average_velocity += cell_boid.velocity;
-                nearby_boids += 1;
+            let mut vel = Vec2::ZERO;
+            // let mut average_velocity = Vec2::ZERO;
+            // let mut nearby_boids = 0;
+            let position = transform.translation.xy();
+            let cell = spatial_grid.at_world_position(position);
+            // for cell_boid in cell
+            //     .cell_boids()
+            //     .iter()
+            //     .filter(|cell_boid| cell_boid.entity != entity)
+            // {
+            //     average_velocity += cell_boid.velocity;
+            //     nearby_boids += 1;
+            // }
+            for rule in &*rules {
+                vel += rule(BoidRuleParametres {
+                    entity,
+                    position,
+                    velocity: boid.velocity(),
+                    cell,
+                });
             }
-            if nearby_boids > 1 {
-                average_velocity /= nearby_boids as f32;
-                if average_velocity.length_squared() > boid_configuration.threshold {
-                    let current_dir = boid.velocity().normalize_or_zero();
-                    let force_direction = average_velocity.normalize_or_zero();
-                    let new_dir = current_dir.lerp(force_direction, 0.03).normalize_or_zero();
-                    let new_velocity = new_dir * boid.velocity().length();
-                    boid.speed = new_velocity.length();
-                    boid.angle = new_velocity.to_angle();
-                }
-            }
+            boid.set_velocity(vel);
+            // if nearby_boids > 1 {
+            //     average_velocity /= nearby_boids as f32;
+            //     if average_velocity.length_squared() > boid_configuration.threshold {
+            //         let current_dir = boid.velocity().normalize_or_zero();
+            //         let force_direction = average_velocity.normalize_or_zero();
+            //         let new_dir = current_dir.lerp(force_direction, 0.03).normalize_or_zero();
+            //         let new_velocity = new_dir * boid.velocity().length();
+            //         boid.speed = new_velocity.length();
+            //         boid.angle = new_velocity.to_angle();
+            //     }
+            // }
         }
         transform.translation += boid.velocity().extend(0.0) * time.delta_secs();
         transform.rotation = Quat::from_axis_angle(Vec3::Z, boid.angle);
