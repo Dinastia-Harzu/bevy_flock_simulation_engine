@@ -2,12 +2,10 @@ use super::{components::*, resources::*};
 use crate::{asset_related::resources::*, states::*};
 use bevy::{
     color::palettes::css::*,
-    math::{FloatPow, NormedVectorSpace},
     prelude::*,
 };
 use core::f32;
 use rand::Rng;
-use std::collections::HashMap;
 
 pub fn clear_simulation(mut commands: Commands, boids: Query<Entity, With<Boid>>) {
     for entity in boids {
@@ -97,7 +95,7 @@ pub fn update_boids(
         &mut Transform,
         Option<&mut BoidTestingUnit>,
     )>,
-    boid_configuration: Res<BoidConfiguration>,
+    _boid_configuration: Res<BoidConfiguration>,
     spatial_grid: Res<SpatialGrid>,
     rules: Res<BoidRules>,
     time: Res<Time>,
