@@ -1,10 +1,13 @@
+use std::fmt::Debug;
+
 use bevy::prelude::*;
 use bevy_inspector_egui::prelude::*;
 
 #[derive(Resource, Reflect, InspectorOptions)]
 #[reflect(Resource, InspectorOptions)]
 pub struct BoidConfiguration {
-    pub speed: f32,
+    pub min_speed: f32,
+    pub max_speed: f32,
     pub inner_perception_radius: f32,
     pub outer_perception_radius: f32,
     pub separation_factor: f32,
@@ -14,7 +17,7 @@ pub struct BoidConfiguration {
 }
 
 impl BoidConfiguration {
-    pub const MAX_VEL: f32 = 600.0;
+    pub const MAX_VEL: f32 = 100.0;
     pub const MAX_BOIDS: u32 = 500;
     pub const MAX_INNER_PERCEPTION_RADIUS: f32 = 500.0;
     pub const MAX_OUTER_PERCEPTION_RADIUS: f32 = 2000.0;
@@ -32,7 +35,11 @@ pub struct SpatialGridBoid {
 
 impl SpatialGridBoid {
     pub fn new(entity: Entity, position: Vec2, velocity: Vec2) -> Self {
-        Self { entity, position, velocity }
+        Self {
+            entity,
+            position,
+            velocity,
+        }
     }
 }
 
@@ -73,6 +80,12 @@ impl SpatialGridCell {
 
     pub fn contains(&self, location: Vec2) -> bool {
         self.rect.contains(location)
+    }
+}
+
+impl Debug for SpatialGridCell {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        writeln!(f, "{} boids", self.boids.len())
     }
 }
 
@@ -170,15 +183,34 @@ impl SpatialGrid {
     }
 
     pub fn index_from_world_position(&self, world_position: Vec2) -> usize {
-        let grid_size = self.grid_size();
-        let half_size = grid_size / 2.0;
+        if world_position.is_nan() {
+            dbg!("AINHOA CÁLLATE");
+        }
+        let half_size = self.grid_size() / 2.0;
         assert!(
             (-half_size.x..=half_size.x).contains(&world_position.x)
                 && (-half_size.y..=half_size.y).contains(&world_position.y),
-            "Esta posición no entra en ninguna celda del SpatialGrid"
+            "La posición {world_position} no entra en ninguna celda del SpatialGrid"
         );
-        let UVec2 { x: column, y: row } = ((world_position + half_size) / grid_size).as_uvec2();
+        let UVec2 { x: column, y: row } =
+            ((world_position + half_size) / self.cell_size()).as_uvec2();
         (row * self.columns + column) as usize
+    }
+}
+
+impl Debug for SpatialGrid {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        for (i, cell) in self.cells.iter().enumerate() {
+            let i = i as u32;
+            writeln!(
+                f,
+                "Celda ({}, {}): {:?}",
+                i / self.rows,
+                i % self.columns,
+                cell
+            )?;
+        }
+        Ok(())
     }
 }
 
@@ -204,11 +236,11 @@ pub struct BoidRuleParametres<'a> {
     pub entity: Entity,
     pub position: Vec2,
     pub velocity: Vec2,
-    pub cell: &'a SpatialGridCell
+    pub cell: &'a SpatialGridCell,
 }
 
-pub trait Rule: Fn(BoidRuleParametres) -> Vec2 + Send + Sync + 'static {}
-impl<T: Fn(BoidRuleParametres) -> Vec2 + Send + Sync + 'static> Rule for T {}
+pub trait Rule: Fn(BoidRuleParametres, &BoidConfiguration) -> Vec2 + Send + Sync + 'static {}
+impl<T: Fn(BoidRuleParametres, &BoidConfiguration) -> Vec2 + Send + Sync + 'static> Rule for T {}
 
 #[derive(Resource, Default)]
 pub struct BoidRules(Vec<Box<dyn Rule>>);

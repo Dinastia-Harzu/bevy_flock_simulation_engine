@@ -14,7 +14,8 @@ impl Plugin for BoidSimulationPlugin {
         app.init_state::<SimulationState>()
             .init_resource::<BoidRules>()
             .insert_resource(BoidConfiguration {
-                speed: 20.0,
+                min_speed: 200.0,
+                max_speed: 500.0,
                 inner_perception_radius: 35.0,
                 outer_perception_radius: 100.0,
                 separation_factor: 1.0,

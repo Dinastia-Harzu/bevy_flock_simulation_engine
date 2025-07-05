@@ -1,11 +1,16 @@
 use super::resources::*;
-use bevy::prelude::*;
+use bevy::{
+    math::{FloatPow, NormedVectorSpace},
+    prelude::*,
+};
 
 pub fn setup_rules(mut rules: ResMut<BoidRules>) {
-    rules.add(cohesion).add(separation).add(alignment);
+    // rules.add(cohesion).add(separation).add(alignment);
+    rules.add(separation);
+    // rules.add(cohesion);
 }
 
-pub fn cohesion(params: BoidRuleParametres) -> Vec2 {
+pub fn cohesion(params: BoidRuleParametres, _config: &BoidConfiguration) -> Vec2 {
     let BoidRuleParametres {
         entity,
         position,
@@ -22,31 +27,40 @@ pub fn cohesion(params: BoidRuleParametres) -> Vec2 {
         perceived_centre += other_boid.position;
         neighbour_count += 1;
     }
-    perceived_centre /= neighbour_count as f32;
+    if neighbour_count > 1 {
+        perceived_centre /= neighbour_count as f32;
+    }
     (perceived_centre - position) / 100.0
 }
 
-pub fn separation(params: BoidRuleParametres) -> Vec2 {
+pub fn separation(params: BoidRuleParametres, config: &BoidConfiguration) -> Vec2 {
     let BoidRuleParametres {
         entity,
         position,
         cell,
         ..
     } = params;
-    let mut c = Vec2::ZERO;
+    let mut push_force = Vec2::ZERO;
+    let radius_squared = config.inner_perception_radius.squared();
     for other_boid in cell
         .cell_boids()
         .iter()
         .filter(|cell_boid| cell_boid.entity != entity)
     {
-        if other_boid.position.distance_squared(position) < 35.0 {
-            c -= other_boid.position - position;
+        let distance_squared = position.distance_squared(other_boid.position);
+        if distance_squared < radius_squared {
+            let r = other_boid.position - position;
+            push_force -= radius_squared * if distance_squared < 1.0 {
+                Vec2::Y
+            } else {
+                1.0 / distance_squared * r.normalize_or_zero()
+            };
         }
     }
-    c
+    push_force
 }
 
-pub fn alignment(params: BoidRuleParametres) -> Vec2 {
+pub fn alignment(params: BoidRuleParametres, _config: &BoidConfiguration) -> Vec2 {
     let BoidRuleParametres {
         entity,
         velocity,

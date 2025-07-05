@@ -22,7 +22,7 @@ pub fn spawn_boids(
     let bounds = spatial_grid.grid_size() / 2.0;
     let scale = Vec3::ONE;
     for _ in 0..BoidConfiguration::MAX_BOIDS {
-        let angle = rng.random_range(-pi..=pi) - f32::consts::FRAC_PI_2;
+        let angle = rng.random_range(-pi..=pi);
         let transform = Transform::from_scale(scale)
             .with_rotation(Quat::from_axis_angle(Vec3::Z, angle))
             .with_translation(Vec3::new(
@@ -30,7 +30,10 @@ pub fn spawn_boids(
                 rng.random_range(-bounds.y..=bounds.y),
                 0.0,
             ));
-        let boid = Boid::new(boid_configuration.speed, angle);
+        let boid = Boid::new(
+            (boid_configuration.min_speed + boid_configuration.max_speed) / 2.0,
+            angle,
+        );
         let boid_entity = commands
             .spawn((
                 Name::from("Boid"),
@@ -83,7 +86,7 @@ pub fn update_boids(
         &mut Transform,
         Option<&mut BoidTestingUnit>,
     )>,
-    _boid_configuration: Res<BoidConfiguration>,
+    boid_configuration: Res<BoidConfiguration>,
     spatial_grid: Res<SpatialGrid>,
     rules: Res<BoidRules>,
     time: Res<Time>,
@@ -92,19 +95,25 @@ pub fn update_boids(
         if testing_unit.is_none()
             || testing_unit.is_some_and(|testing_unit| testing_unit.follow_boids)
         {
-            let mut vel = Vec2::ZERO;
+            let mut velocity = Vec2::ZERO;
             let position = transform.translation.xy();
             let cell = spatial_grid.at_world_position(position);
             for rule in &*rules {
-                vel += rule(BoidRuleParametres {
-                    entity,
-                    position,
-                    velocity: boid.velocity(),
-                    cell,
-                });
+                velocity += rule(
+                    BoidRuleParametres {
+                        entity,
+                        position,
+                        velocity: boid.velocity(),
+                        cell,
+                    },
+                    &boid_configuration,
+                );
             }
-            boid.set_velocity(vel);
+            boid.add_velocity(velocity, &boid_configuration);
+            // boid.velocity += velocity;
         }
+        // transform.translation += boid.velocity.extend(0.0) * time.delta_secs();
+        // transform.rotation = Quat::from_axis_angle(Vec3::Z, boid.velocity.to_angle());
         transform.translation += boid.velocity().extend(0.0) * time.delta_secs();
         transform.rotation = Quat::from_axis_angle(Vec3::Z, boid.angle);
     }
@@ -114,15 +123,16 @@ pub fn wrap_edges(boids: Query<&mut Transform, With<Boid>>, spatial_grid: Res<Sp
     for mut transform in boids {
         let Vec2 { x: bx, y: by } = spatial_grid.grid_size() / 2.0;
         let Vec3 { x, y, .. } = &mut transform.translation;
-        if *x > bx {
-            *x = -bx;
-        } else if *x < -bx {
-            *x = bx;
+        let safe_offset = 0.1f32;
+        if *x >= bx {
+            *x = safe_offset - bx;
+        } else if *x <= -bx {
+            *x = bx - safe_offset;
         }
-        if *y > by {
-            *y = -by;
-        } else if *y < -by {
-            *y = by;
+        if *y >= by {
+            *y = safe_offset - by;
+        } else if *y <= -by {
+            *y = by - safe_offset;
         }
     }
 }
