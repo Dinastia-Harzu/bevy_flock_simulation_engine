@@ -3,7 +3,7 @@ pub(crate) mod resources;
 pub(crate) mod rules;
 pub(crate) mod systems;
 
-use self::{components::*, resources::*, systems::*, rules::*};
+use self::{components::*, resources::*, rules::*, systems::*};
 use crate::states::*;
 use bevy::prelude::*;
 
@@ -13,16 +13,7 @@ impl Plugin for BoidSimulationPlugin {
     fn build(&self, app: &mut App) {
         app.init_state::<SimulationState>()
             .init_resource::<BoidRules>()
-            .insert_resource(BoidConfiguration {
-                min_speed: 200.0,
-                max_speed: 500.0,
-                inner_perception_radius: 35.0,
-                outer_perception_radius: 100.0,
-                separation_factor: 1.0,
-                alignment_factor: 1.0,
-                cohesion_factor: 1.0,
-                threshold: 0.001,
-            })
+            .insert_resource(BoidConfiguration::default())
             .insert_resource(SpatialGrid::new(5, 7, 200.0))
             .insert_resource(SimulationConfiguration::default())
             .register_type::<Boid>()

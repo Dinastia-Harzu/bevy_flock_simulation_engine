@@ -3,7 +3,7 @@ use crate::{
     states::SimulationState,
 };
 use bevy::prelude::*;
-use bevy_egui::*;
+use bevy_egui::{egui::SliderClamping, *};
 use bevy_inspector_egui::{bevy_inspector::*, DefaultInspectorConfigPlugin};
 
 pub struct InspectorPlugin;
@@ -30,8 +30,37 @@ pub fn inspector_ui(world: &mut World) {
 
     egui::Window::new("Boids Config").show(egui_context.get_mut(), |ui| {
         egui::ScrollArea::vertical().show(ui, |ui| {
+            let mut boid_config = world.resource_mut::<BoidConfiguration>();
             ui.heading("Configuración de los boids");
-            ui_for_resource::<BoidConfiguration>(world, ui);
+            let min_speed = boid_config.min_speed;
+            let max_speed = boid_config.max_speed;
+            ui.label("Parámetros comunes:");
+            ui.add(
+                egui::Slider::new(
+                    &mut boid_config.min_speed,
+                    BoidConfiguration::lowest_speed()..=max_speed,
+                )
+                .text("Velocidad mínima"),
+            );
+            ui.add(
+                egui::Slider::new(
+                    &mut boid_config.max_speed,
+                    min_speed..=BoidConfiguration::highest_speed(),
+                )
+                .text("Velocidad máxima"),
+            );
+            ui.add(
+                egui::Slider::new(&mut boid_config.boid_count, BoidConfiguration::BOIDS_RANGE)
+                    .text("Número de boids"),
+            );
+            ui.label("Parámetros personalizados:");
+            for (name, (value, range)) in &mut boid_config {
+                ui.add(
+                    egui::Slider::new(value, range.clone())
+                        .clamping(SliderClamping::Never)
+                        .text(format!("{name} ({} - {})", *range.start(), *range.end())),
+                );
+            }
 
             let Ok((mut selected_boid, mut testing_boid)) = world
                 .query::<(&mut Boid, &mut BoidTestingUnit)>()
@@ -44,8 +73,10 @@ pub fn inspector_ui(world: &mut World) {
             ui.heading("Boid seleccionado");
             ui.checkbox(follow_boids, "Seguir demás boids");
             if !*follow_boids {
-                ui.label("Velocidad: ");
-                ui.add(egui::Slider::new(&mut selected_boid.speed, 0.0..=500.0));
+                ui.add(
+                    egui::Slider::new(&mut selected_boid.speed, BoidConfiguration::SPEED_RANGE)
+                        .text("Velocidad"),
+                );
                 ui.label("Ángulo: ");
                 ui.drag_angle(&mut selected_boid.angle);
             }
@@ -64,9 +95,9 @@ pub fn inspector_ui(world: &mut World) {
         });
     });
 
-    // egui::Window::new("Boids").show(egui_context.get_mut(), |ui| {
-    //     egui::ScrollArea::vertical().show(ui, |ui| {
-    //         ui_for_entities_filtered::<Filter<With<Boid>>>(world, ui, true, &Filter::all());
-    //     });
-    // });
+    egui::Window::new("Boids").show(egui_context.get_mut(), |ui| {
+        egui::ScrollArea::vertical().show(ui, |ui| {
+            ui_for_world(world, ui);
+        });
+    });
 }

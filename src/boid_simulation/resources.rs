@@ -1,4 +1,4 @@
-use std::fmt::Debug;
+use std::{collections::HashMap, fmt::Debug, ops::RangeInclusive};
 
 use bevy::prelude::*;
 use bevy_inspector_egui::prelude::*;
@@ -8,22 +8,129 @@ use bevy_inspector_egui::prelude::*;
 pub struct BoidConfiguration {
     pub min_speed: f32,
     pub max_speed: f32,
-    pub inner_perception_radius: f32,
-    pub outer_perception_radius: f32,
-    pub separation_factor: f32,
-    pub alignment_factor: f32,
-    pub cohesion_factor: f32,
-    pub threshold: f32,
+    pub boid_count: u32,
+    pub scalar_parametres: HashMap<String, (f32, RangeInclusive<f32>)>,
 }
 
 impl BoidConfiguration {
-    pub const MAX_VEL: f32 = 100.0;
-    pub const MAX_BOIDS: u32 = 500;
-    pub const MAX_INNER_PERCEPTION_RADIUS: f32 = 500.0;
-    pub const MAX_OUTER_PERCEPTION_RADIUS: f32 = 2000.0;
-    pub const MAX_SEPARATION_FACTOR: f32 = 10.0;
-    pub const MAX_ALIGNMENT_FACTOR: f32 = 10.0;
-    pub const MAX_COHESION_FACTOR: f32 = 10.0;
+    pub const SPEED_RANGE: RangeInclusive<f32> = 10.0..=500.0;
+    pub const BOIDS_RANGE: RangeInclusive<u32> = 3..=500;
+
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn lowest_speed() -> f32 {
+        *Self::SPEED_RANGE.start()
+    }
+
+    pub fn highest_speed() -> f32 {
+        *Self::SPEED_RANGE.end()
+    }
+
+    pub fn min_boids() -> u32 {
+        *Self::BOIDS_RANGE.start()
+    }
+
+    pub fn max_boids() -> u32 {
+        *Self::BOIDS_RANGE.end()
+    }
+
+    pub fn add_scalar_parametre(
+        &mut self,
+        name: &str,
+        value: f32,
+        range: RangeInclusive<f32>,
+    ) -> &mut Self {
+        self.scalar_parametres
+            .insert(name.to_owned(), (value, range));
+        self
+    }
+
+    pub fn scalar_parametre(&self, name: &str) -> f32 {
+        *self.get_scalar_parametre(name).expect("No existe ningún parámetro con este nombre. Asegúrate de que lo has escrito bien o de que realmente has añadido este parámetro").0
+    }
+
+    pub fn scalar_parametre_mut(&mut self, name: &str) -> &mut f32 {
+        &mut *self.get_scalar_parametre_mut(name).expect("No existe ningún parámetro con este nombre. Asegúrate de que lo has escrito bien o de que realmente has añadido este parámetro").0
+    }
+
+    pub fn lower_scalar_constant(&self, name: &str) -> f32 {
+        *self.get_scalar_range_constant(name).start()
+    }
+
+    pub fn upper_scalar_constant(&self, name: &str) -> f32 {
+        *self.get_scalar_range_constant(name).end()
+    }
+
+    fn get_scalar_parametre(&self, name: &str) -> Option<(&f32, &RangeInclusive<f32>)> {
+        match self.scalar_parametres.get(name) {
+            Some((value, range)) => Some((value, range)),
+            None => None,
+        }
+    }
+
+    fn get_scalar_parametre_mut(&mut self, name: &str) -> Option<(&mut f32, &RangeInclusive<f32>)> {
+        match self.scalar_parametres.get_mut(name) {
+            Some((value, range)) => Some((value, range)),
+            None => None,
+        }
+    }
+
+    fn get_scalar_range_constant(&self, name: &str) -> RangeInclusive<f32> {
+        self.get_scalar_parametre(name)
+            .expect("No existe esto")
+            .1
+            .clone()
+    }
+}
+
+impl Default for BoidConfiguration {
+    fn default() -> Self {
+        Self {
+            min_speed: 100.0,
+            max_speed: 300.0,
+            boid_count: Self::max_boids(),
+            scalar_parametres: HashMap::new(),
+        }
+    }
+}
+
+impl IntoIterator for BoidConfiguration {
+    type Item = (String, (f32, RangeInclusive<f32>));
+    type IntoIter = std::collections::hash_map::IntoIter<String, (f32, RangeInclusive<f32>)>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.scalar_parametres.into_iter()
+    }
+}
+
+impl<'a> IntoIterator for &'a BoidConfiguration {
+    type Item = (&'a String, (&'a f32, &'a RangeInclusive<f32>));
+    type IntoIter = std::iter::Map<
+        std::collections::hash_map::Iter<'a, String, (f32, RangeInclusive<f32>)>,
+        fn((&'a String, &'a (f32, RangeInclusive<f32>))) -> Self::Item,
+    >;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.scalar_parametres
+            .iter()
+            .map(|(k, v)| -> Self::Item { (k, (&v.0, &v.1)) })
+    }
+}
+
+impl<'a> IntoIterator for &'a mut BoidConfiguration {
+    type Item = (&'a String, (&'a mut f32, &'a RangeInclusive<f32>));
+    type IntoIter = std::iter::Map<
+        std::collections::hash_map::IterMut<'a, String, (f32, RangeInclusive<f32>)>,
+        fn((&'a String, &'a mut (f32, RangeInclusive<f32>))) -> Self::Item,
+    >;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.scalar_parametres
+            .iter_mut()
+            .map(|(k, v)| -> Self::Item { (k, (&mut v.0, &v.1)) })
+    }
 }
 
 #[derive(Reflect)]
@@ -58,7 +165,7 @@ impl SpatialGridCell {
         Self {
             grid_pos: (row, column).into(),
             rect: Rect::from_center_size(centre, Vec2::new(size, size)),
-            boids: Vec::with_capacity(BoidConfiguration::MAX_BOIDS as usize),
+            boids: Vec::with_capacity(BoidConfiguration::max_boids() as usize),
         }
     }
 

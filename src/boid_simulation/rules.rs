@@ -4,10 +4,14 @@ use bevy::{
     prelude::*,
 };
 
-pub fn setup_rules(mut rules: ResMut<BoidRules>) {
+pub fn setup_rules(mut rules: ResMut<BoidRules>, mut config: ResMut<BoidConfiguration>) {
     // rules.add(cohesion).add(separation).add(alignment);
     rules.add(separation);
     // rules.add(cohesion);
+
+    config
+        .add_scalar_parametre("avoidance_radius", 50.0, 1.0..=100.0)
+        .add_scalar_parametre("view_radius", 100.0, 1.0..=200.0);
 }
 
 pub fn cohesion(params: BoidRuleParametres, _config: &BoidConfiguration) -> Vec2 {
@@ -41,7 +45,8 @@ pub fn separation(params: BoidRuleParametres, config: &BoidConfiguration) -> Vec
         ..
     } = params;
     let mut push_force = Vec2::ZERO;
-    let radius_squared = config.inner_perception_radius.squared();
+    let radius = config.scalar_parametre("avoidance_radius");
+    let radius_squared = radius.squared();
     for other_boid in cell
         .cell_boids()
         .iter()
@@ -50,11 +55,12 @@ pub fn separation(params: BoidRuleParametres, config: &BoidConfiguration) -> Vec
         let distance_squared = position.distance_squared(other_boid.position);
         if distance_squared < radius_squared {
             let r = other_boid.position - position;
-            push_force -= radius_squared * if distance_squared < 1.0 {
-                Vec2::Y
-            } else {
-                1.0 / distance_squared * r.normalize_or_zero()
-            };
+            push_force -= radius_squared
+                * if distance_squared < 0.1 {
+                    Vec2::Y
+                } else {
+                    1.0 / distance_squared * r.normalize()
+                };
         }
     }
     push_force

@@ -21,7 +21,7 @@ pub fn spawn_boids(
     let pi = f32::consts::PI;
     let bounds = spatial_grid.grid_size() / 2.0;
     let scale = Vec3::ONE;
-    for _ in 0..BoidConfiguration::MAX_BOIDS {
+    for _ in 0..boid_configuration.boid_count {
         let angle = rng.random_range(-pi..=pi);
         let transform = Transform::from_scale(scale)
             .with_rotation(Quat::from_axis_angle(Vec3::Z, angle))
@@ -147,17 +147,26 @@ pub fn update_debug_boid(
         return;
     }
 
-    if let Some(boid) = testing_unit_boid {
-        let (transform, mut sprite) = boid.into_inner();
-        let position = transform.translation.xy();
-        sprite.color = Color::srgb(0.3, 0.3, 1.0);
-        gizmos
-            .circle_2d(position, boid_configuration.inner_perception_radius, RED)
-            .resolution(64);
-        gizmos
-            .circle_2d(position, boid_configuration.outer_perception_radius, GREEN)
-            .resolution(64);
-    }
+    let Some(boid) = testing_unit_boid else {
+        return;
+    };
+    let (transform, mut sprite) = boid.into_inner();
+    let position = transform.translation.xy();
+    sprite.color = Color::srgb(0.3, 0.3, 1.0);
+    gizmos
+        .circle_2d(
+            position,
+            boid_configuration.scalar_parametre("avoidance_radius"),
+            RED,
+        )
+        .resolution(64);
+    gizmos
+        .circle_2d(
+            position,
+            boid_configuration.scalar_parametre("view_radius"),
+            GREEN,
+        )
+        .resolution(64);
 }
 
 pub fn draw_spatial_grid(
