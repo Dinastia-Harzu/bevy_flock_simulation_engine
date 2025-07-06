@@ -1,20 +1,18 @@
 use super::resources::*;
-use bevy::{
-    math::{FloatPow, NormedVectorSpace},
-    prelude::*,
-};
+use bevy::{math::FloatPow, prelude::*};
 
 pub fn setup_rules(mut rules: ResMut<BoidRules>, mut config: ResMut<BoidConfiguration>) {
-    // rules.add(cohesion).add(separation).add(alignment);
-    rules.add(separation);
-    // rules.add(cohesion);
+    rules.add(cohesion).add(separation).add(alignment);
 
     config
         .add_scalar_parametre("avoidance_radius", 50.0, 1.0..=100.0)
-        .add_scalar_parametre("view_radius", 100.0, 1.0..=200.0);
+        .add_scalar_parametre("view_radius", 100.0, 1.0..=200.0)
+        .add_scalar_parametre("cohesion_weight", 0.25, 0.0..=5.0)
+        .add_scalar_parametre("separation_weight", 1.0, 0.0..=5.0)
+        .add_scalar_parametre("alignment_weight", 0.125, 0.0..=5.0);
 }
 
-pub fn cohesion(params: BoidRuleParametres, _config: &BoidConfiguration) -> Vec2 {
+pub fn cohesion(params: BoidRuleParametres, config: &BoidConfiguration) -> Vec2 {
     let BoidRuleParametres {
         entity,
         position,
@@ -34,7 +32,7 @@ pub fn cohesion(params: BoidRuleParametres, _config: &BoidConfiguration) -> Vec2
     if neighbour_count > 1 {
         perceived_centre /= neighbour_count as f32;
     }
-    (perceived_centre - position) / 100.0
+    (perceived_centre - position) * config.scalar_parametre("cohesion_weight")
 }
 
 pub fn separation(params: BoidRuleParametres, config: &BoidConfiguration) -> Vec2 {
@@ -55,18 +53,19 @@ pub fn separation(params: BoidRuleParametres, config: &BoidConfiguration) -> Vec
         let distance_squared = position.distance_squared(other_boid.position);
         if distance_squared < radius_squared {
             let r = other_boid.position - position;
-            push_force -= radius_squared
+            push_force -= config.scalar_parametre("separation_weight")
+                * radius_squared
                 * if distance_squared < 0.1 {
                     Vec2::Y
                 } else {
-                    1.0 / distance_squared * r.normalize()
+                    r.normalize() / distance_squared
                 };
         }
     }
     push_force
 }
 
-pub fn alignment(params: BoidRuleParametres, _config: &BoidConfiguration) -> Vec2 {
+pub fn alignment(params: BoidRuleParametres, config: &BoidConfiguration) -> Vec2 {
     let BoidRuleParametres {
         entity,
         velocity,
@@ -83,6 +82,8 @@ pub fn alignment(params: BoidRuleParametres, _config: &BoidConfiguration) -> Vec
         perceived_velocity += other_boid.velocity;
         neighbour_count += 1;
     }
-    perceived_velocity /= neighbour_count as f32;
-    (perceived_velocity - velocity) / 8.0
+    if neighbour_count > 1 {
+        perceived_velocity /= neighbour_count as f32;
+    }
+    (perceived_velocity - velocity) * config.scalar_parametre("alignment_weight")
 }

@@ -290,9 +290,6 @@ impl SpatialGrid {
     }
 
     pub fn index_from_world_position(&self, world_position: Vec2) -> usize {
-        if world_position.is_nan() {
-            dbg!("AINHOA CÁLLATE");
-        }
         let half_size = self.grid_size() / 2.0;
         assert!(
             (-half_size.x..=half_size.x).contains(&world_position.x)
