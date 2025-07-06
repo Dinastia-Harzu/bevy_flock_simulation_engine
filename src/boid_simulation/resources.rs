@@ -9,12 +9,14 @@ pub struct BoidConfiguration {
     pub min_speed: f32,
     pub max_speed: f32,
     pub boid_count: u32,
+    pub scale: f32,
     pub scalar_parametres: HashMap<String, (f32, RangeInclusive<f32>)>,
 }
 
 impl BoidConfiguration {
     pub const SPEED_RANGE: RangeInclusive<f32> = 10.0..=500.0;
     pub const BOIDS_RANGE: RangeInclusive<u32> = 3..=500;
+    pub const SCALE_RANGE: RangeInclusive<f32> = 0.0..=3.0;
 
     pub fn new() -> Self {
         Self::default()
@@ -91,6 +93,7 @@ impl Default for BoidConfiguration {
             min_speed: 100.0,
             max_speed: 300.0,
             boid_count: Self::max_boids(),
+            scale: 1.0,
             scalar_parametres: HashMap::new(),
         }
     }

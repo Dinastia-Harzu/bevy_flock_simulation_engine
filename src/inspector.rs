@@ -53,6 +53,10 @@ pub fn inspector_ui(world: &mut World) {
                 egui::Slider::new(&mut boid_config.boid_count, BoidConfiguration::BOIDS_RANGE)
                     .text("Número de boids"),
             );
+            ui.add(
+                egui::Slider::new(&mut boid_config.scale, BoidConfiguration::SCALE_RANGE)
+                    .text("Tamaño de los boids"),
+            );
             ui.label("Parámetros personalizados:");
             for (name, (value, range)) in &mut boid_config {
                 ui.add(

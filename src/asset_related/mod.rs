@@ -14,6 +14,7 @@ impl Plugin for AssetsPlugin {
         app.add_loading_state(
             LoadingState::new(AppState::Loading)
                 .continue_to_state(AppState::Next)
+                .with_dynamic_assets_file::<StandardDynamicAssetCollection>("assets.ron")
                 .load_collection::<ImageAssets>(),
         )
         .add_systems(Update, use_asset_handles.run_if(in_state(AppState::Next)));

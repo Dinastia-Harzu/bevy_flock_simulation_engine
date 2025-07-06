@@ -92,11 +92,16 @@ pub fn update_boids(
     time: Res<Time>,
 ) {
     for (entity, mut boid, mut transform, testing_unit) in boids {
+        let Transform {
+            translation,
+            rotation,
+            scale,
+        } = &mut *transform;
         if testing_unit.is_none()
             || testing_unit.is_some_and(|testing_unit| testing_unit.follow_boids)
         {
             let mut velocity = Vec2::ZERO;
-            let position = transform.translation.xy();
+            let position = translation.xy();
             let cell = spatial_grid.at_world_position(position);
             for rule in &*rules {
                 velocity += rule(
@@ -112,10 +117,9 @@ pub fn update_boids(
             boid.add_velocity(velocity, &boid_configuration);
             // boid.velocity += velocity;
         }
-        // transform.translation += boid.velocity.extend(0.0) * time.delta_secs();
-        // transform.rotation = Quat::from_axis_angle(Vec3::Z, boid.velocity.to_angle());
-        transform.translation += boid.velocity().extend(0.0) * time.delta_secs();
-        transform.rotation = Quat::from_axis_angle(Vec3::Z, boid.angle);
+        *translation += boid.velocity().extend(0.0) * time.delta_secs();
+        *rotation = Quat::from_axis_angle(Vec3::Z, boid.angle);
+        *scale = Vec2::splat(boid_configuration.scale).extend(1.0);
     }
 }
 
