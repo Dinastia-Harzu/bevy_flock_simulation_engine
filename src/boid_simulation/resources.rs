@@ -15,7 +15,7 @@ pub struct BoidConfiguration {
 
 impl BoidConfiguration {
     pub const SPEED_RANGE: RangeInclusive<f32> = 10.0..=500.0;
-    pub const BOIDS_RANGE: RangeInclusive<u32> = 3..=500;
+    pub const BOIDS_RANGE: RangeInclusive<u32> = 3..=5000;
     pub const SCALE_RANGE: RangeInclusive<f32> = 0.0..=3.0;
 
     pub fn new() -> Self {
@@ -92,7 +92,7 @@ impl Default for BoidConfiguration {
         Self {
             min_speed: 100.0,
             max_speed: 300.0,
-            boid_count: Self::max_boids(),
+            boid_count: Self::max_boids() / 10,
             scale: 1.0,
             scalar_parametres: HashMap::new(),
         }
@@ -293,6 +293,7 @@ impl SpatialGrid {
     }
 
     pub fn index_from_world_position(&self, world_position: Vec2) -> usize {
+        let total_cells = self.rows * self.columns;
         let half_size = self.grid_size() / 2.0;
         assert!(
             (-half_size.x..=half_size.x).contains(&world_position.x)
@@ -301,7 +302,9 @@ impl SpatialGrid {
         );
         let UVec2 { x: column, y: row } =
             ((world_position + half_size) / self.cell_size()).as_uvec2();
-        (row * self.columns + column) as usize
+        let i = row * self.columns + column;
+        assert!(i < total_cells, "La conversión posición global -> índice debe dar menor que {total_cells}, pero ha dado {i}");
+        i as usize
     }
 }
 

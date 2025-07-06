@@ -80,7 +80,7 @@ pub fn update_spatial_grid(
 }
 
 pub fn update_boids(
-    boids: Query<(
+    mut boids: Query<(
         Entity,
         &mut Boid,
         &mut Transform,
@@ -91,36 +91,38 @@ pub fn update_boids(
     rules: Res<BoidRules>,
     time: Res<Time>,
 ) {
-    for (entity, mut boid, mut transform, testing_unit) in boids {
-        let Transform {
-            translation,
-            rotation,
-            scale,
-        } = &mut *transform;
-        if testing_unit.is_none()
-            || testing_unit.is_some_and(|testing_unit| testing_unit.follow_boids)
-        {
-            let mut velocity = Vec2::ZERO;
-            let position = translation.xy();
-            let cell = spatial_grid.at_world_position(position);
-            for rule in &*rules {
-                velocity += rule(
-                    BoidRuleParametres {
-                        entity,
-                        position,
-                        velocity: boid.velocity(),
-                        cell,
-                    },
-                    &boid_configuration,
-                );
+    boids
+        .par_iter_mut()
+        .for_each(|(entity, mut boid, mut transform, testing_unit)| {
+            let Transform {
+                translation,
+                rotation,
+                scale,
+            } = &mut *transform;
+            if testing_unit.is_none()
+                || testing_unit.is_some_and(|testing_unit| testing_unit.follow_boids)
+            {
+                let mut velocity = Vec2::ZERO;
+                let position = translation.xy();
+                let cell = spatial_grid.at_world_position(position);
+                for rule in &*rules {
+                    velocity += rule(
+                        BoidRuleParametres {
+                            entity,
+                            position,
+                            velocity: boid.velocity(),
+                            cell,
+                        },
+                        &boid_configuration,
+                    );
+                }
+                boid.add_velocity(velocity, &boid_configuration);
+                // boid.velocity += velocity;
             }
-            boid.add_velocity(velocity, &boid_configuration);
-            // boid.velocity += velocity;
-        }
-        *translation += boid.velocity().extend(0.0) * time.delta_secs();
-        *rotation = Quat::from_axis_angle(Vec3::Z, boid.angle);
-        *scale = Vec2::splat(boid_configuration.scale).extend(1.0);
-    }
+            *translation += boid.velocity().extend(0.0) * time.delta_secs();
+            *rotation = Quat::from_axis_angle(Vec3::Z, boid.angle);
+            *scale = Vec2::splat(boid_configuration.scale).extend(1.0);
+        });
 }
 
 pub fn wrap_edges(boids: Query<&mut Transform, With<Boid>>, spatial_grid: Res<SpatialGrid>) {
