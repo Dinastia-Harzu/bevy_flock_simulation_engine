@@ -3,3 +3,6 @@
 
 # Ignorar carpeta de recursos (imágenes, audio, etc.)
 /assets
+
+# Ignorar ciertos archivos irrelevantes al proyecto
+/.gdb_history
