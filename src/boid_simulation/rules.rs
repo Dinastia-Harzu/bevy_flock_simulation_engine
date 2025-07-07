@@ -2,14 +2,20 @@ use super::resources::*;
 use bevy::{math::FloatPow, prelude::*};
 
 pub fn setup_rules(mut rules: ResMut<BoidRules>, mut config: ResMut<BoidConfiguration>) {
-    rules.add(cohesion).add(separation).add(alignment);
+    rules
+        .add(cohesion)
+        .add(separation)
+        .add(alignment)
+        .add(strong_wind);
 
     config
         .add_scalar_parametre("avoidance_radius", 50.0, 1.0..=100.0)
         .add_scalar_parametre("view_radius", 100.0, 1.0..=200.0)
         .add_scalar_parametre("cohesion_weight", 0.25, 0.0..=5.0)
         .add_scalar_parametre("separation_weight", 1.0, 0.0..=5.0)
-        .add_scalar_parametre("alignment_weight", 0.125, 0.0..=5.0);
+        .add_scalar_parametre("alignment_weight", 0.125, 0.0..=5.0)
+        .add_scalar_parametre("wind_angle", -120.0, -180.0..=180.0)
+        .add_scalar_parametre("wind_speed", 20.0, 0.0..=500.0);
 }
 
 pub fn cohesion(params: BoidRuleParametres, config: &BoidConfiguration) -> Vec2 {
@@ -86,4 +92,9 @@ pub fn alignment(params: BoidRuleParametres, config: &BoidConfiguration) -> Vec2
         perceived_velocity /= neighbour_count as f32;
     }
     (perceived_velocity - velocity) * config.scalar_parametre("alignment_weight")
+}
+
+pub fn strong_wind(_params: BoidRuleParametres, config: &BoidConfiguration) -> Vec2 {
+    Vec2::from_angle(config.scalar_parametre("wind_angle").to_radians())
+        * config.scalar_parametre("wind_speed")
 }
