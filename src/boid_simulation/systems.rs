@@ -14,7 +14,7 @@ pub fn spawn_boids(
     mut commands: Commands,
     boid_configuration: Res<BoidConfiguration>,
     simulation_configuration: Res<SimulationConfiguration>,
-    mut spatial_grid: ResMut<SpatialGrid>,
+    spatial_grid: Res<SpatialGrid>,
     image_assets: Res<ImageAssets>,
     mut app_next_state: ResMut<NextState<SimulationState>>,
 ) {
@@ -24,33 +24,26 @@ pub fn spawn_boids(
     let scale = Vec3::ONE;
     for _ in 0..boid_configuration.boid_count {
         let angle = rng.random_range(-pi..=pi);
-        let transform = Transform::from_scale(scale)
-            .with_rotation(Quat::from_axis_angle(Vec3::Z, angle))
-            .with_translation(Vec3::new(
-                rng.random_range(-bounds.x..=bounds.x),
-                rng.random_range(-bounds.y..=bounds.y),
-                0.0,
-            ));
         let boid = Boid::new(
             (boid_configuration.min_speed + boid_configuration.max_speed) / 2.0,
             angle,
         );
-        let boid_entity = commands
-            .spawn((
-                Name::from("Boid"),
-                boid,
-                Sprite {
-                    image: image_assets.boid_sprite.clone(),
-                    color: Color::srgb(0.1, 1.0, 0.2),
-                    ..default()
-                },
-                transform,
-            ))
-            .id();
-        let position = transform.translation.xy();
-        spatial_grid
-            .at_world_position_mut(position)
-            .push(SpatialGridBoid::new(boid_entity, position, boid.velocity()));
+        commands.spawn((
+            Name::from("Boid"),
+            boid,
+            Sprite {
+                image: image_assets.boid_sprite.clone(),
+                color: Color::srgb(0.1, 1.0, 0.2),
+                ..default()
+            },
+            Transform::from_scale(scale)
+                .with_rotation(Quat::from_axis_angle(Vec3::Z, angle))
+                .with_translation(Vec3::new(
+                    rng.random_range(-bounds.x..=bounds.x),
+                    rng.random_range(-bounds.y..=bounds.y),
+                    0.0,
+                )),
+        ));
     }
     commands.spawn((
         Name::from("Boid objetivo"),
