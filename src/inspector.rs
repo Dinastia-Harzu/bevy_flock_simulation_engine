@@ -92,10 +92,12 @@ pub fn inspector_ui(world: &mut World) {
                     .resource_mut::<NextState<SimulationState>>()
                     .set(SimulationState::Setup);
             }
-            ui.checkbox(
-                &mut world.resource_mut::<SimulationConfiguration>().should_draw,
-                "Dibujar cosas para depurar",
-            );
+            let SimulationConfiguration {
+                should_draw,
+                with_predator,
+            } = &mut *world.resource_mut::<SimulationConfiguration>();
+            ui.checkbox(should_draw, "Dibujar cosas para depurar");
+            ui.checkbox(with_predator, "Con boid depredador");
         });
     });
 

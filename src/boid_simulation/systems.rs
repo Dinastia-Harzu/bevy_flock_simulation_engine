@@ -13,6 +13,7 @@ pub fn clear_simulation(mut commands: Commands, boids: Query<Entity, With<Boid>>
 pub fn spawn_boids(
     mut commands: Commands,
     boid_configuration: Res<BoidConfiguration>,
+    simulation_configuration: Res<SimulationConfiguration>,
     mut spatial_grid: ResMut<SpatialGrid>,
     image_assets: Res<ImageAssets>,
     mut app_next_state: ResMut<NextState<SimulationState>>,
@@ -40,7 +41,7 @@ pub fn spawn_boids(
                 boid,
                 Sprite {
                     image: image_assets.boid_sprite.clone(),
-                    color: Color::srgb(1.0, 0.2, 0.2),
+                    color: Color::srgb(0.1, 1.0, 0.2),
                     ..default()
                 },
                 transform,
@@ -62,6 +63,28 @@ pub fn spawn_boids(
         Transform::from_scale(scale).with_translation(Vec3::Z),
         BoidTestingUnit::default(),
     ));
+
+    // Predator(s)
+    if simulation_configuration.with_predator {
+        let angle = rng.random_range(-pi..=pi);
+        commands.spawn((
+            Name::from("Boid depredador"),
+            Boid::default().with_angle(angle),
+            Sprite {
+                image: image_assets.boid_sprite.clone(),
+                color: Color::srgb(1.0, 0.2, 0.2),
+                ..default()
+            },
+            Transform::from_scale(scale)
+                .with_rotation(Quat::from_axis_angle(Vec3::Z, angle))
+                .with_translation(Vec3::new(
+                    rng.random_range(-bounds.x..=bounds.x),
+                    rng.random_range(-bounds.y..=bounds.y),
+                    0.0,
+                )),
+            BoidPredator::default(),
+        ));
+    }
 
     app_next_state.set(SimulationState::Running);
 }
@@ -85,26 +108,27 @@ pub fn update_boids(
         &mut Boid,
         &mut Transform,
         Option<&mut BoidTestingUnit>,
+        Option<&BoidPredator>,
     )>,
     boid_configuration: Res<BoidConfiguration>,
     spatial_grid: Res<SpatialGrid>,
     rules: Res<BoidRules>,
     time: Res<Time>,
 ) {
-    boids
-        .par_iter_mut()
-        .for_each(|(entity, mut boid, mut transform, testing_unit)| {
+    boids.par_iter_mut().for_each(
+        |(entity, mut boid, mut transform, testing_unit, predator_boid)| {
             let Transform {
                 translation,
                 rotation,
                 scale,
             } = &mut *transform;
-            if testing_unit.is_none()
-                || testing_unit.is_some_and(|testing_unit| testing_unit.follow_boids)
+            let position = translation.xy();
+            let cell = spatial_grid.at_world_position(position);
+            if (testing_unit.is_none()
+                || testing_unit.is_some_and(|testing_unit| testing_unit.follow_boids))
+                && predator_boid.is_none()
             {
                 let mut velocity = Vec2::ZERO;
-                let position = translation.xy();
-                let cell = spatial_grid.at_world_position(position);
                 for rule in &*rules {
                     velocity += rule(
                         BoidRuleParametres {
@@ -118,11 +142,35 @@ pub fn update_boids(
                 }
                 boid.add_velocity(velocity, &boid_configuration);
                 // boid.velocity += velocity;
+            } else if predator_boid.is_some() {
+                let mut closest = None;
+                for other_boid in cell
+                    .cell_boids()
+                    .iter()
+                    .filter(|cell_boid| cell_boid.entity != entity)
+                {
+                    if position.distance(other_boid.position)
+                        < position.distance(closest.unwrap_or(Vec2::MAX))
+                    {
+                        closest = Some(other_boid.position);
+                    }
+                }
+                let velocity = {
+                    let current_velocity = boid.velocity();
+                    boid_configuration.scalar_parametre("Predator follow weight")
+                        * if let Some(closest) = closest {
+                            (closest - position).normalize_or(current_velocity) * boid.speed
+                        } else {
+                            current_velocity
+                        }
+                };
+                boid.add_velocity(velocity, &boid_configuration);
             }
             *translation += boid.velocity().extend(0.0) * time.delta_secs();
             *rotation = Quat::from_axis_angle(Vec3::Z, boid.angle);
             *scale = Vec2::splat(boid_configuration.scale).extend(1.0);
-        });
+        },
+    );
 }
 
 pub fn wrap_edges(boids: Query<&mut Transform, With<Boid>>, spatial_grid: Res<SpatialGrid>) {

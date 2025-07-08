@@ -7,13 +7,21 @@ use super::resources::BoidConfiguration;
 pub struct Boid {
     pub speed: f32,
     pub angle: f32,
-    pub velocity: Vec2,
 }
 
 impl Boid {
     pub fn new(speed: f32, angle: f32) -> Self {
-        let velocity = Vec2::from_angle(angle) * speed;
-        Self { speed, angle, velocity }
+        Self { speed, angle }
+    }
+
+    pub fn with_speed(mut self, speed: f32) -> Self {
+        self.speed = speed;
+        self
+    }
+
+    pub fn with_angle(mut self, angle: f32) -> Self {
+        self.angle = angle;
+        self
     }
 
     pub fn velocity(&self) -> Vec2 {
@@ -37,7 +45,7 @@ pub struct BoidTestingUnit {
 }
 
 impl BoidTestingUnit {
-    fn new(follow_boids: bool) -> Self {
+    pub fn new(follow_boids: bool) -> Self {
         Self { follow_boids }
     }
 }
@@ -45,5 +53,23 @@ impl BoidTestingUnit {
 impl Default for BoidTestingUnit {
     fn default() -> Self {
         Self::new(true)
+    }
+}
+
+#[derive(Component, Clone, Copy, Reflect)]
+#[reflect(Component)]
+pub struct BoidPredator {
+    pub follow_weight: f32
+}
+
+impl BoidPredator {
+    pub fn new(follow_weight: f32) -> Self {
+        Self { follow_weight }
+    }
+}
+
+impl Default for BoidPredator {
+    fn default() -> Self {
+        Self::new(0.1)
     }
 }
