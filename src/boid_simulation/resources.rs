@@ -296,14 +296,14 @@ impl SpatialGrid {
         let total_cells = self.rows * self.columns;
         let half_size = self.grid_size() / 2.0;
         assert!(
-            (-half_size.x..=half_size.x).contains(&world_position.x)
-                && (-half_size.y..=half_size.y).contains(&world_position.y),
+            (-half_size.x..half_size.x).contains(&world_position.x)
+                && (-half_size.y..half_size.y).contains(&world_position.y),
             "La posición {world_position} no entra en ninguna celda del SpatialGrid"
         );
         let UVec2 { x: column, y: row } =
             ((world_position + half_size) / self.cell_size()).as_uvec2();
         let i = row * self.columns + column;
-        assert!(i < total_cells, "La conversión posición global -> índice debe dar menor que {total_cells}, pero ha dado {i}");
+        assert!(i < total_cells, "La conversión posición global ({world_position}) -> índice debe dar menor que {total_cells}, pero ha dado {row} * {} + {column} = {i}", self.columns);
         i as usize
     }
 }
