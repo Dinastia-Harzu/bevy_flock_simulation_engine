@@ -1,6 +1,6 @@
 use super::{components::*, resources::*};
 use crate::{asset_related::resources::*, states::*};
-use bevy::{color::palettes::css::*, prelude::*};
+use bevy::{color::palettes::css::*, math::FloatPow, prelude::*};
 use core::f32;
 use rand::Rng;
 
@@ -96,20 +96,22 @@ pub fn update_spatial_grid(
 }
 
 pub fn update_boids(
-    mut boids: Query<(
-        Entity,
-        &mut Boid,
-        &mut Transform,
-        Option<&mut BoidTestingUnit>,
-        Option<&BoidPredator>,
-    )>,
+    mut boids: Query<
+        (Entity, &mut Boid, &mut Transform, Option<&BoidTestingUnit>),
+        Without<BoidPredator>,
+    >,
+    mut boid_predators: Query<
+        (Entity, &mut Boid, &mut Transform, &BoidPredator),
+        Without<BoidTestingUnit>,
+    >,
     boid_configuration: Res<BoidConfiguration>,
     spatial_grid: Res<SpatialGrid>,
     rules: Res<BoidRules>,
     time: Res<Time>,
 ) {
-    boids.par_iter_mut().for_each(
-        |(entity, mut boid, mut transform, testing_unit, predator_boid)| {
+    boids
+        .par_iter_mut()
+        .for_each(|(entity, mut boid, mut transform, testing_unit)| {
             let Transform {
                 translation,
                 rotation,
@@ -117,53 +119,121 @@ pub fn update_boids(
             } = &mut *transform;
             let position = translation.xy();
             let cell = spatial_grid.at_world_position(position);
-            if (testing_unit.is_none()
-                || testing_unit.is_some_and(|testing_unit| testing_unit.follow_boids))
-                && predator_boid.is_none()
+            let mut velocity = Vec2::ZERO;
+
+            if testing_unit.is_none()
+                || testing_unit.is_some_and(|testing_unit| testing_unit.follow_boids)
             {
-                let mut velocity = Vec2::ZERO;
-                for rule in &*rules {
-                    velocity += rule(
-                        BoidRuleParametres {
-                            entity,
-                            position,
-                            velocity: boid.velocity(),
-                            cell,
-                        },
-                        &boid_configuration,
-                    );
-                }
-                boid.add_velocity(velocity, &boid_configuration);
-                // boid.velocity += velocity;
-            } else if predator_boid.is_some() {
-                let mut closest = None;
+                // Common
+                let mut perceived_centre = Vec2::ZERO;
+                let mut push_force = Vec2::ZERO;
+                let mut perceived_velocity = Vec2::ZERO;
+                let mut neighbours_to_follow = 0;
+                let view_radius = boid_configuration.scalar_parametre("view_radius");
+                let view_radius_squared = view_radius.squared();
+                let avoidance_radius = boid_configuration.scalar_parametre("avoidance_radius");
+                let avoidance_radius_squared = avoidance_radius.squared();
                 for other_boid in cell
                     .cell_boids()
                     .iter()
                     .filter(|cell_boid| cell_boid.entity != entity)
                 {
-                    if position.distance(other_boid.position)
-                        < position.distance(closest.unwrap_or(Vec2::MAX))
-                    {
-                        closest = Some(other_boid.position);
+                    let distance_squared = position.distance_squared(other_boid.position);
+                    if distance_squared < avoidance_radius_squared {
+                        let r = other_boid.position - position;
+                        push_force -= boid_configuration.scalar_parametre("separation_weight")
+                            * avoidance_radius_squared
+                            * if distance_squared < 0.1 {
+                                Vec2::Y
+                            } else {
+                                r.normalize() / distance_squared
+                            };
+                    } else if distance_squared < view_radius_squared {
+                        perceived_centre += other_boid.position;
+                        perceived_velocity += other_boid.velocity;
+                        neighbours_to_follow += 1;
                     }
                 }
-                let velocity = {
-                    let current_velocity = boid.velocity();
-                    boid_configuration.scalar_parametre("Predator follow weight")
-                        * if let Some(closest) = closest {
-                            (closest - position).normalize_or(current_velocity) * boid.speed
-                        } else {
-                            current_velocity
-                        }
-                };
-                boid.add_velocity(velocity, &boid_configuration);
+                if neighbours_to_follow > 1 {
+                    let neighbours_to_follow = neighbours_to_follow as f32;
+                    perceived_centre /= neighbours_to_follow;
+                    perceived_velocity /= neighbours_to_follow;
+                }
+
+                // Cohesion
+                velocity += (perceived_centre - position)
+                    * boid_configuration.scalar_parametre("cohesion_weight");
+
+                // Separation
+                velocity += push_force;
+
+                // Alignment
+                velocity += (perceived_velocity - velocity)
+                    * boid_configuration.scalar_parametre("alignment_weight");
+
+                // Strong wind
+                velocity += Vec2::from_angle(
+                    boid_configuration
+                        .scalar_parametre("wind_angle")
+                        .to_radians(),
+                ) * boid_configuration.scalar_parametre("wind_speed");
+
+                // for rule in &*rules {
+                //     velocity += rule(
+                //         BoidRuleParametres {
+                //             entity,
+                //             position,
+                //             velocity: boid.velocity(),
+                //             cell,
+                //         },
+                //         &boid_configuration,
+                //     );
+                // }
             }
+
+            boid.add_velocity(velocity, &boid_configuration);
             *translation += boid.velocity().extend(0.0) * time.delta_secs();
             *rotation = Quat::from_axis_angle(Vec3::Z, boid.angle);
             *scale = Vec2::splat(boid_configuration.scale).extend(1.0);
-        },
-    );
+        });
+    boid_predators
+        .par_iter_mut()
+        .for_each(|(entity, mut boid, mut transform, boid_predator)| {
+            let Transform {
+                translation,
+                rotation,
+                scale,
+            } = &mut *transform;
+            let position = translation.xy();
+            let cell = spatial_grid.at_world_position(position);
+
+            let mut closest = None;
+            for other_boid in cell
+                .cell_boids()
+                .iter()
+                .filter(|cell_boid| cell_boid.entity != entity)
+            {
+                if position.distance(other_boid.position)
+                    < position.distance(closest.unwrap_or(Vec2::MAX))
+                {
+                    closest = Some(other_boid.position);
+                }
+            }
+            let velocity = {
+                let current_velocity = boid.velocity();
+                boid_predator.follow_weight
+                    * if let Some(closest) = closest {
+                        (closest - position).normalize_or(current_velocity) * boid.speed
+                    } else {
+                        current_velocity
+                    }
+            };
+
+            boid.add_velocity(velocity, &boid_configuration);
+            *translation += boid.velocity().extend(0.0) * time.delta_secs();
+            *rotation = Quat::from_axis_angle(Vec3::Z, boid.angle);
+            *scale = Vec2::splat(boid_configuration.scale).extend(1.0);
+        });
 }
 
 pub fn wrap_edges(boids: Query<&mut Transform, With<Boid>>, spatial_grid: Res<SpatialGrid>) {
