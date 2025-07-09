@@ -177,18 +177,6 @@ pub fn update_boids(
                         .scalar_parametre("wind_angle")
                         .to_radians(),
                 ) * boid_configuration.scalar_parametre("wind_speed");
-
-                // for rule in &*rules {
-                //     velocity += rule(
-                //         BoidRuleParametres {
-                //             entity,
-                //             position,
-                //             velocity: boid.velocity(),
-                //             cell,
-                //         },
-                //         &boid_configuration,
-                //     );
-                // }
             }
 
             boid.add_velocity(velocity, &boid_configuration);
@@ -213,8 +201,11 @@ pub fn update_boids(
                 .iter()
                 .filter(|cell_boid| cell_boid.entity != entity)
             {
-                if position.distance(other_boid.position)
-                    < position.distance(closest.unwrap_or(Vec2::MAX))
+                let distance = position.distance(other_boid.position);
+                if distance
+                    < boid_configuration
+                        .scalar_parametre("view_radius")
+                        .min(position.distance(closest.unwrap_or(Vec2::MAX)))
                 {
                     closest = Some(other_boid.position);
                 }
