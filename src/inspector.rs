@@ -98,6 +98,12 @@ pub fn inspector_ui(world: &mut World) {
             } = &mut *world.resource_mut::<SimulationConfiguration>();
             ui.checkbox(should_draw, "Dibujar cosas para depurar");
             ui.checkbox(with_predator, "Con boid depredador");
+            if let Ok(mut boid_predator) = world.query::<&mut BoidPredator>().single_mut(world) {
+                ui.add(
+                    egui::Slider::new(&mut boid_predator.follow_weight, 0.0..=1.0)
+                        .text("Peso de atosigamiento"),
+                );
+            }
         });
     });
 

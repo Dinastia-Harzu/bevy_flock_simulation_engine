@@ -15,8 +15,7 @@ pub fn setup_rules(mut rules: ResMut<BoidRules>, mut config: ResMut<BoidConfigur
         .add_scalar_parametre("separation_weight", 1.0, 0.0..=5.0)
         .add_scalar_parametre("alignment_weight", 0.125, 0.0..=5.0)
         .add_scalar_parametre("wind_angle", -120.0, -180.0..=180.0)
-        .add_scalar_parametre("wind_speed", 0.01, 0.0..=10.0)
-        .add_scalar_parametre("Predator follow weight", 0.1, 0.0..=1.0);
+        .add_scalar_parametre("wind_speed", 0.1, 0.0..=10.0);
 }
 
 pub fn cohesion(params: BoidRuleParametres, config: &BoidConfiguration) -> Vec2 {
