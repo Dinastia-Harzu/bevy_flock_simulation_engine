@@ -168,18 +168,19 @@ pub fn update_boids(
 
 pub fn wrap_edges(boids: Query<&mut Transform, With<Boid>>, spatial_grid: Res<SpatialGrid>) {
     for mut transform in boids {
-        let Vec2 { x: bx, y: by } = spatial_grid.grid_size() / 2.0;
+        let safe_offset = Vec2::splat(0.1f32);
+        let bounds = spatial_grid.grid_size() / 2.0;
+        let Vec2 { x: bx, y: by } = bounds - safe_offset;
         let Vec3 { x, y, .. } = &mut transform.translation;
-        let safe_offset = 0.1f32;
         if *x >= bx {
-            *x = safe_offset - bx;
+            *x = -bx;
         } else if *x <= -bx {
-            *x = bx - safe_offset;
+            *x = bx;
         }
         if *y >= by {
-            *y = safe_offset - by;
+            *y = -by;
         } else if *y <= -by {
-            *y = by - safe_offset;
+            *y = by;
         }
     }
 }
