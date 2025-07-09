@@ -3,6 +3,7 @@ mod boid_simulation;
 mod components;
 mod constants;
 mod inspector;
+mod miscellaneous;
 mod resources;
 mod states;
 mod systems;

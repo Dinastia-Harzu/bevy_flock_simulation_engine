@@ -1,5 +1,5 @@
 use super::{components::*, resources::*};
-use crate::{asset_related::resources::*, states::*};
+use crate::{asset_related::resources::*, miscellaneous::*, states::*};
 use bevy::{color::palettes::css::*, math::FloatPow, prelude::*};
 use core::f32;
 use rand::Rng;
@@ -233,16 +233,8 @@ pub fn wrap_edges(boids: Query<&mut Transform, With<Boid>>, spatial_grid: Res<Sp
         let bounds = spatial_grid.grid_size() / 2.0;
         let Vec2 { x: bx, y: by } = bounds - safe_offset;
         let Vec3 { x, y, .. } = &mut transform.translation;
-        if *x >= bx {
-            *x = -bx;
-        } else if *x <= -bx {
-            *x = bx;
-        }
-        if *y >= by {
-            *y = -by;
-        } else if *y <= -by {
-            *y = by;
-        }
+        x.toroidal_clamp(-bx, bx);
+        y.toroidal_clamp(-by, by);
     }
 }
 
