@@ -139,19 +139,25 @@ pub fn update_boids(
                     .filter(|cell_boid| cell_boid.entity != entity)
                 {
                     let distance_squared = position.distance_squared(other_boid.position);
-                    if distance_squared < avoidance_radius_squared {
-                        let r = other_boid.position - position;
-                        push_force -= boid_configuration.scalar_parametre("separation_weight")
-                            * avoidance_radius_squared
-                            * if distance_squared < 0.1 {
-                                Vec2::Y
-                            } else {
-                                r.normalize() / distance_squared
-                            };
-                    } else if distance_squared < view_radius_squared {
-                        perceived_centre += other_boid.position;
-                        perceived_velocity += other_boid.velocity;
-                        neighbours_to_follow += 1;
+                    let r = other_boid.position - position;
+                    if let Ok((_, _, _, predator)) = boid_predators.get(other_boid.entity) {
+                        if distance_squared < view_radius_squared {
+                            push_force -= boid_configuration.scalar_parametre("Flee weight") * r.normalize() * boid.speed;
+                        }
+                    } else {
+                        if distance_squared < avoidance_radius_squared {
+                            push_force -= boid_configuration.scalar_parametre("separation_weight")
+                                * avoidance_radius_squared
+                                * if distance_squared < 0.1 {
+                                    Vec2::Y
+                                } else {
+                                    r.normalize() / distance_squared
+                                };
+                        } else if distance_squared < view_radius_squared {
+                            perceived_centre += other_boid.position;
+                            perceived_velocity += other_boid.velocity;
+                            neighbours_to_follow += 1;
+                        }
                     }
                 }
                 if neighbours_to_follow > 1 {
