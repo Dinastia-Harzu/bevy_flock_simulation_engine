@@ -58,7 +58,7 @@ pub fn spawn_boids(
     ));
 
     // Predator(s)
-    if simulation_configuration.with_predator {
+    for _ in 0..simulation_configuration.predators {
         let angle = rng.random_range(-pi..=pi);
         commands.spawn((
             Name::from("Boid depredador"),
@@ -75,7 +75,7 @@ pub fn spawn_boids(
                     rng.random_range(-bounds.y..=bounds.y),
                     0.0,
                 )),
-            BoidPredator::default(),
+            BoidPredator,
         ));
     }
 
@@ -101,10 +101,11 @@ pub fn update_boids(
         Without<BoidPredator>,
     >,
     mut boid_predators: Query<
-        (Entity, &mut Boid, &mut Transform, &BoidPredator),
-        Without<BoidTestingUnit>,
+        (Entity, &mut Boid, &mut Transform),
+        (With<BoidPredator>, Without<BoidTestingUnit>),
     >,
     boid_configuration: Res<BoidConfiguration>,
+    simulation_configuration: Res<SimulationConfiguration>,
     spatial_grid: Res<SpatialGrid>,
     rules: Res<BoidRules>,
     time: Res<Time>,
@@ -140,9 +141,11 @@ pub fn update_boids(
                 {
                     let distance_squared = position.distance_squared(other_boid.position);
                     let r = other_boid.position - position;
-                    if let Ok((_, _, _, predator)) = boid_predators.get(other_boid.entity) {
+                    if boid_predators.contains(other_boid.entity) {
                         if distance_squared < view_radius_squared {
-                            push_force -= boid_configuration.scalar_parametre("Flee weight") * r.normalize() * boid.speed;
+                            push_force -= boid_configuration.scalar_parametre("Flee weight")
+                                * r.normalize()
+                                * boid.speed;
                         }
                     } else {
                         if distance_squared < avoidance_radius_squared {
@@ -192,7 +195,7 @@ pub fn update_boids(
         });
     boid_predators
         .par_iter_mut()
-        .for_each(|(entity, mut boid, mut transform, boid_predator)| {
+        .for_each(|(entity, mut boid, mut transform)| {
             let Transform {
                 translation,
                 rotation,
@@ -200,12 +203,13 @@ pub fn update_boids(
             } = &mut *transform;
             let position = translation.xy();
             let cell = spatial_grid.at_world_position(position);
+            let mut velocity = Vec2::ZERO;
 
             let mut closest = None;
             for other_boid in cell
                 .cell_boids()
                 .iter()
-                .filter(|cell_boid| cell_boid.entity != entity)
+                .filter(|cell_boid| cell_boid.entity != entity && boids.contains(cell_boid.entity))
             {
                 let distance = position.distance(other_boid.position);
                 if distance
@@ -216,15 +220,24 @@ pub fn update_boids(
                     closest = Some(other_boid.position);
                 }
             }
-            let velocity = {
+
+            // Hunt
+            velocity += {
                 let current_velocity = boid.velocity();
-                boid_predator.follow_weight
+                simulation_configuration.predator_hunt_weight
                     * if let Some(closest) = closest {
                         (closest - position).normalize_or(current_velocity) * boid.speed
                     } else {
                         current_velocity
                     }
             };
+
+            // Strong wind
+            velocity += Vec2::from_angle(
+                boid_configuration
+                    .scalar_parametre("wind_angle")
+                    .to_radians(),
+            ) * boid_configuration.scalar_parametre("wind_speed");
 
             boid.add_velocity(velocity, &boid_configuration);
             *translation += boid.velocity().extend(0.0) * time.delta_secs();

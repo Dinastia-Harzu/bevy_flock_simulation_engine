@@ -56,20 +56,5 @@ impl Default for BoidTestingUnit {
     }
 }
 
-#[derive(Component, Clone, Copy, Reflect)]
-#[reflect(Component)]
-pub struct BoidPredator {
-    pub follow_weight: f32
-}
-
-impl BoidPredator {
-    pub fn new(follow_weight: f32) -> Self {
-        Self { follow_weight }
-    }
-}
-
-impl Default for BoidPredator {
-    fn default() -> Self {
-        Self::new(0.1)
-    }
-}
+#[derive(Component)]
+pub struct BoidPredator;

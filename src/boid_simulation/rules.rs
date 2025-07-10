@@ -11,9 +11,9 @@ pub fn setup_rules(mut rules: ResMut<BoidRules>, mut config: ResMut<BoidConfigur
     config
         .add_scalar_parametre("avoidance_radius", 50.0, 1.0..=100.0)
         .add_scalar_parametre("view_radius", 100.0, 1.0..=200.0)
-        .add_scalar_parametre("cohesion_weight", 0.25, 0.0..=5.0)
+        .add_scalar_parametre("cohesion_weight", 0.25, 0.0..=1.0)
         .add_scalar_parametre("separation_weight", 1.0, 0.0..=5.0)
-        .add_scalar_parametre("alignment_weight", 0.125, 0.0..=5.0)
+        .add_scalar_parametre("alignment_weight", 0.125, 0.0..=1.0)
         .add_scalar_parametre("wind_angle", -120.0, -180.0..=180.0)
         .add_scalar_parametre("wind_speed", 0.1, 0.0..=10.0)
         .add_scalar_parametre("Flee weight", 0.5, 0.0..=1.0);

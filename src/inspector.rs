@@ -62,45 +62,49 @@ pub fn inspector_ui(world: &mut World) {
                 ui.add(
                     egui::Slider::new(value, range.clone())
                         .clamping(SliderClamping::Never)
-                        .text(format!("{name} ({} - {})", *range.start(), *range.end())),
+                        .text(format!("{name} [{}..{}]", *range.start(), *range.end())),
                 );
             }
 
-            let Ok((mut selected_boid, mut testing_boid)) = world
+            if let Ok((mut selected_boid, mut testing_boid)) = world
                 .query::<(&mut Boid, &mut BoidTestingUnit)>()
                 .single_mut(world)
-            else {
-                return;
-            };
-            let follow_boids = &mut testing_boid.follow_boids;
-            ui.separator();
-            ui.heading("Boid seleccionado");
-            ui.checkbox(follow_boids, "Seguir demás boids");
-            if !*follow_boids {
-                ui.add(
-                    egui::Slider::new(&mut selected_boid.speed, BoidConfiguration::SPEED_RANGE)
-                        .text("Velocidad"),
-                );
-                ui.label("Ángulo: ");
-                ui.drag_angle(&mut selected_boid.angle);
+            {
+                let follow_boids = &mut testing_boid.follow_boids;
+                ui.separator();
+                ui.heading("Boid seleccionado");
+                ui.checkbox(follow_boids, "Seguir demás boids");
+                if !*follow_boids {
+                    ui.add(
+                        egui::Slider::new(&mut selected_boid.speed, min_speed..=max_speed)
+                            .text("Velocidad"),
+                    );
+                    ui.label("Ángulo: ");
+                    ui.drag_angle(&mut selected_boid.angle);
+                }
             }
 
             ui.separator();
-            ui.heading("Otros");
+            ui.heading("Simulación");
             if ui.button("Reiniciar simulación").clicked() {
                 world
                     .resource_mut::<NextState<SimulationState>>()
                     .set(SimulationState::Setup);
             }
+            let there_are_predators = !world
+                .query_filtered::<(), With<BoidPredator>>()
+                .query(world)
+                .is_empty();
             let SimulationConfiguration {
                 should_draw,
-                with_predator,
+                predators,
+                predator_hunt_weight,
             } = &mut *world.resource_mut::<SimulationConfiguration>();
             ui.checkbox(should_draw, "Dibujar cosas para depurar");
-            ui.checkbox(with_predator, "Con boid depredador");
-            if let Ok(mut boid_predator) = world.query::<&mut BoidPredator>().single_mut(world) {
+            ui.add(egui::Slider::new(predators, 0..=10).text("Depredadores"));
+            if there_are_predators {
                 ui.add(
-                    egui::Slider::new(&mut boid_predator.follow_weight, 0.0..=1.0)
+                    egui::Slider::new(predator_hunt_weight, 0.0..=1.0)
                         .text("Peso de atosigamiento"),
                 );
             }

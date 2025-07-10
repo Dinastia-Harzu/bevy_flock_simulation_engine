@@ -328,21 +328,23 @@ impl Debug for SpatialGrid {
 #[reflect(Resource, InspectorOptions)]
 pub struct SimulationConfiguration {
     pub should_draw: bool,
-    pub with_predator: bool,
+    pub predators: u32,
+    pub predator_hunt_weight: f32,
 }
 
 impl SimulationConfiguration {
-    fn new(should_draw: bool, with_predator: bool) -> Self {
+    fn new(should_draw: bool, predators: u32, predator_hunt_weight: f32) -> Self {
         Self {
             should_draw,
-            with_predator,
+            predators,
+            predator_hunt_weight,
         }
     }
 }
 
 impl Default for SimulationConfiguration {
     fn default() -> Self {
-        Self::new(true, true)
+        Self::new(true, 5, 0.25)
     }
 }
 
