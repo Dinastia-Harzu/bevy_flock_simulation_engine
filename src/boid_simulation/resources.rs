@@ -136,6 +136,63 @@ impl<'a> IntoIterator for &'a mut BoidConfiguration {
     }
 }
 
+#[derive(Resource, Reflect, InspectorOptions)]
+#[reflect(Resource, InspectorOptions)]
+pub struct SimulationConfiguration {
+    pub should_draw: bool,
+    pub predators: u32,
+    pub predator_hunt_weight: f32,
+}
+
+impl SimulationConfiguration {
+    fn new(should_draw: bool, predators: u32, predator_hunt_weight: f32) -> Self {
+        Self {
+            should_draw,
+            predators,
+            predator_hunt_weight,
+        }
+    }
+}
+
+impl Default for SimulationConfiguration {
+    fn default() -> Self {
+        Self::new(true, 5, 0.25)
+    }
+}
+
+pub struct BoidRuleParametres<'a> {
+    pub entity: Entity,
+    pub position: Vec2,
+    pub velocity: Vec2,
+    pub cell: &'a SpatialGridCell,
+}
+
+pub trait Rule: Fn(BoidRuleParametres, &BoidConfiguration) -> Vec2 + Send + Sync + 'static {}
+impl<T: Fn(BoidRuleParametres, &BoidConfiguration) -> Vec2 + Send + Sync + 'static> Rule for T {}
+
+#[derive(Resource, Default)]
+pub struct BoidRules(Vec<Box<dyn Rule>>);
+
+impl BoidRules {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn add(&mut self, rule: impl Rule) -> &mut Self {
+        self.0.push(Box::new(rule));
+        self
+    }
+}
+
+impl<'a> IntoIterator for &'a BoidRules {
+    type Item = &'a Box<dyn Rule>;
+    type IntoIter = std::slice::Iter<'a, Box<dyn Rule>>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.0.iter()
+    }
+}
+
 #[derive(Reflect)]
 pub struct SpatialGridBoid {
     pub entity: Entity,
@@ -321,62 +378,5 @@ impl Debug for SpatialGrid {
             )?;
         }
         Ok(())
-    }
-}
-
-#[derive(Resource, Reflect, InspectorOptions)]
-#[reflect(Resource, InspectorOptions)]
-pub struct SimulationConfiguration {
-    pub should_draw: bool,
-    pub predators: u32,
-    pub predator_hunt_weight: f32,
-}
-
-impl SimulationConfiguration {
-    fn new(should_draw: bool, predators: u32, predator_hunt_weight: f32) -> Self {
-        Self {
-            should_draw,
-            predators,
-            predator_hunt_weight,
-        }
-    }
-}
-
-impl Default for SimulationConfiguration {
-    fn default() -> Self {
-        Self::new(true, 5, 0.25)
-    }
-}
-
-pub struct BoidRuleParametres<'a> {
-    pub entity: Entity,
-    pub position: Vec2,
-    pub velocity: Vec2,
-    pub cell: &'a SpatialGridCell,
-}
-
-pub trait Rule: Fn(BoidRuleParametres, &BoidConfiguration) -> Vec2 + Send + Sync + 'static {}
-impl<T: Fn(BoidRuleParametres, &BoidConfiguration) -> Vec2 + Send + Sync + 'static> Rule for T {}
-
-#[derive(Resource, Default)]
-pub struct BoidRules(Vec<Box<dyn Rule>>);
-
-impl BoidRules {
-    pub fn new() -> Self {
-        Self::default()
-    }
-
-    pub fn add(&mut self, rule: impl Rule) -> &mut Self {
-        self.0.push(Box::new(rule));
-        self
-    }
-}
-
-impl<'a> IntoIterator for &'a BoidRules {
-    type Item = &'a Box<dyn Rule>;
-    type IntoIter = std::slice::Iter<'a, Box<dyn Rule>>;
-
-    fn into_iter(self) -> Self::IntoIter {
-        self.0.iter()
     }
 }
