@@ -1,6 +1,5 @@
+use super::resources::*;
 use bevy::prelude::*;
-
-use super::resources::BoidConfiguration;
 
 #[derive(Component, Clone, Copy, Default, Reflect)]
 #[reflect(Component)]

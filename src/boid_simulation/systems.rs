@@ -14,20 +14,17 @@ pub fn spawn_boids(
     mut commands: Commands,
     boid_configuration: Res<BoidConfiguration>,
     simulation_configuration: Res<SimulationConfiguration>,
-    spatial_grid: Res<SpatialGrid>,
+    uniform_grid: Res<UniformGrid>,
     image_assets: Res<ImageAssets>,
     mut app_next_state: ResMut<NextState<SimulationState>>,
 ) {
     let mut rng = rand::rng();
     let pi = f32::consts::PI;
-    let bounds = spatial_grid.grid_size() / 2.0;
+    let bounds = uniform_grid.full_size() / 2.0;
     let scale = Vec3::ONE;
-    for _ in 0..boid_configuration.boid_count {
+    for _ in 0..simulation_configuration.normal_boids {
         let angle = rng.random_range(-pi..=pi);
-        let boid = Boid::new(
-            (boid_configuration.min_speed + boid_configuration.max_speed) / 2.0,
-            angle,
-        );
+        let boid = Boid::new(boid_configuration.average_speed(), angle);
         commands.spawn((
             Name::from("Boid"),
             boid,
@@ -85,6 +82,7 @@ pub fn spawn_boids(
 pub fn update_spatial_grid(
     boids: Query<(Entity, &Transform, &Boid)>,
     mut spatial_grid: ResMut<SpatialGrid>,
+    mut uniform_grid: ResMut<UniformGrid>,
 ) {
     spatial_grid.clear();
     for (entity, transform, boid) in boids {

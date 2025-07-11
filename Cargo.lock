@@ -3344,6 +3344,7 @@ dependencies = [
  "bevy-inspector-egui",
  "bevy_asset_loader",
  "bevy_egui",
+ "itertools 0.14.0",
  "rand 0.9.1",
 ]
 

@@ -1,9 +1,9 @@
 use crate::{
     boid_simulation::{components::*, resources::*},
-    states::SimulationState,
+    states::*,
 };
 use bevy::prelude::*;
-use bevy_egui::{egui::SliderClamping, *};
+use bevy_egui::*;
 use bevy_inspector_egui::{bevy_inspector::*, DefaultInspectorConfigPlugin};
 
 pub struct InspectorPlugin;
@@ -50,20 +50,16 @@ pub fn inspector_ui(world: &mut World) {
                 .text("Velocidad máxima"),
             );
             ui.add(
-                egui::Slider::new(&mut boid_config.boid_count, BoidConfiguration::BOIDS_RANGE)
-                    .text("Número de boids"),
-            );
-            ui.add(
                 egui::Slider::new(&mut boid_config.scale, BoidConfiguration::SCALE_RANGE)
                     .text("Tamaño de los boids"),
             );
             ui.label("Parámetros personalizados:");
             for (name, (value, range)) in &mut boid_config {
-                ui.add(
-                    egui::Slider::new(value, range.clone())
-                        .clamping(SliderClamping::Never)
-                        .text(format!("{name} [{}..{}]", *range.start(), *range.end())),
-                );
+                ui.add(egui::Slider::new(value, range.clone()).text(format!(
+                    "{name} [{}..{}]",
+                    *range.start(),
+                    *range.end()
+                )));
             }
 
             if let Ok((mut selected_boid, mut testing_boid)) = world
@@ -84,29 +80,37 @@ pub fn inspector_ui(world: &mut World) {
                 }
             }
 
-            ui.separator();
-            ui.heading("Simulación");
-            if ui.button("Reiniciar simulación").clicked() {
-                world
-                    .resource_mut::<NextState<SimulationState>>()
-                    .set(SimulationState::Setup);
-            }
             let there_are_predators = !world
                 .query_filtered::<(), With<BoidPredator>>()
                 .query(world)
                 .is_empty();
-            let SimulationConfiguration {
-                should_draw,
-                predators,
-                predator_hunt_weight,
-            } = &mut *world.resource_mut::<SimulationConfiguration>();
-            ui.checkbox(should_draw, "Dibujar cosas para depurar");
-            ui.add(egui::Slider::new(predators, 0..=10).text("Depredadores"));
+            let mut simulation_config = world.resource_mut::<SimulationConfiguration>();
+            ui.separator();
+            ui.heading("Simulación");
+            ui.add(
+                egui::Slider::new(
+                    &mut simulation_config.normal_boids,
+                    SimulationConfiguration::BOIDS_RANGE,
+                )
+                .text("Número de boids"),
+            );
+            ui.checkbox(
+                &mut simulation_config.should_draw,
+                "Dibujar cosas para depurar",
+            );
+            ui.add(
+                egui::Slider::new(&mut simulation_config.predators, 0..=10).text("Depredadores"),
+            );
             if there_are_predators {
                 ui.add(
-                    egui::Slider::new(predator_hunt_weight, 0.0..=1.0)
+                    egui::Slider::new(&mut simulation_config.predator_hunt_weight, 0.0..=1.0)
                         .text("Peso de atosigamiento"),
                 );
+            }
+            if ui.button("Reiniciar simulación").clicked() {
+                world
+                    .resource_mut::<NextState<SimulationState>>()
+                    .set(SimulationState::Setup);
             }
         });
     });

@@ -15,6 +15,7 @@ impl Plugin for BoidSimulationPlugin {
             .init_resource::<BoidRules>()
             .insert_resource(BoidConfiguration::default())
             .insert_resource(SpatialGrid::new(2, 4, 480.0))
+            .insert_resource(UniformGrid::new(Vec2::ZERO, 480.0, 2, 4))
             .insert_resource(SimulationConfiguration::default())
             .register_type::<Boid>()
             .add_systems(Startup, setup_rules)

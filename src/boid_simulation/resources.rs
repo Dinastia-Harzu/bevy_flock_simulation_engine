@@ -1,25 +1,28 @@
-use std::{collections::HashMap, fmt::Debug, ops::RangeInclusive};
-
+use crate::helpers::*;
 use bevy::prelude::*;
 use bevy_inspector_egui::prelude::*;
+use itertools::Itertools;
+use std::{collections::HashMap, fmt::Debug, ops::RangeInclusive};
 
 #[derive(Resource, Reflect, InspectorOptions)]
 #[reflect(Resource, InspectorOptions)]
 pub struct BoidConfiguration {
     pub min_speed: f32,
     pub max_speed: f32,
-    pub boid_count: u32,
     pub scale: f32,
     pub scalar_parametres: HashMap<String, (f32, RangeInclusive<f32>)>,
 }
 
 impl BoidConfiguration {
     pub const SPEED_RANGE: RangeInclusive<f32> = 10.0..=500.0;
-    pub const BOIDS_RANGE: RangeInclusive<u32> = 3..=5000;
     pub const SCALE_RANGE: RangeInclusive<f32> = 0.0..=3.0;
 
     pub fn new() -> Self {
         Self::default()
+    }
+
+    pub fn average_speed(&self) -> f32 {
+        (self.min_speed + self.max_speed) / 2.0
     }
 
     pub fn lowest_speed() -> f32 {
@@ -28,14 +31,6 @@ impl BoidConfiguration {
 
     pub fn highest_speed() -> f32 {
         *Self::SPEED_RANGE.end()
-    }
-
-    pub fn min_boids() -> u32 {
-        *Self::BOIDS_RANGE.start()
-    }
-
-    pub fn max_boids() -> u32 {
-        *Self::BOIDS_RANGE.end()
     }
 
     pub fn add_scalar_parametre(
@@ -92,7 +87,6 @@ impl Default for BoidConfiguration {
         Self {
             min_speed: 100.0,
             max_speed: 300.0,
-            boid_count: Self::max_boids() / 10,
             scale: 1.0,
             scalar_parametres: HashMap::new(),
         }
@@ -140,23 +134,40 @@ impl<'a> IntoIterator for &'a mut BoidConfiguration {
 #[reflect(Resource, InspectorOptions)]
 pub struct SimulationConfiguration {
     pub should_draw: bool,
+    pub normal_boids: u32,
     pub predators: u32,
     pub predator_hunt_weight: f32,
 }
 
 impl SimulationConfiguration {
-    fn new(should_draw: bool, predators: u32, predator_hunt_weight: f32) -> Self {
+    pub const BOIDS_RANGE: RangeInclusive<u32> = 3..=5000;
+
+    fn new(
+        should_draw: bool,
+        normal_boids: u32,
+        predators: u32,
+        predator_hunt_weight: f32,
+    ) -> Self {
         Self {
             should_draw,
+            normal_boids,
             predators,
             predator_hunt_weight,
         }
+    }
+
+    pub fn min_boids() -> u32 {
+        *Self::BOIDS_RANGE.start()
+    }
+
+    pub fn max_boids() -> u32 {
+        *Self::BOIDS_RANGE.end()
     }
 }
 
 impl Default for SimulationConfiguration {
     fn default() -> Self {
-        Self::new(true, 5, 0.25)
+        Self::new(true, Self::max_boids() / 10, 5, 0.25)
     }
 }
 
@@ -193,6 +204,77 @@ impl<'a> IntoIterator for &'a BoidRules {
     }
 }
 
+///////////////////////////////////////////////////////
+///////////////////////////////////////////////////////
+
+#[derive(Resource, Debug)]
+pub struct UniformGrid {
+    rect: CoordMapping,
+    cell_size: f32,
+    data: Vec<(usize, Entity)>,
+    grid: Grid<usize>,
+}
+
+impl UniformGrid {
+    pub fn new(origin: Vec2, cell_size: f32, rows: u32, columns: u32) -> Self {
+        let grid_size = UVec2::new(columns, rows);
+        Self {
+            rect: CoordMapping::new(
+                Rect::from_center_size(origin, grid_size.as_vec2() * cell_size),
+                grid_size,
+            ),
+            cell_size,
+            data: Vec::new(),
+            grid: Grid::new(grid_size, usize::MAX),
+        }
+    }
+
+    pub fn size(&self) -> UVec2 {
+        self.grid.size
+    }
+
+    pub fn full_size(&self) -> Vec2 {
+        self.rect.src.size()
+    }
+
+    pub fn update(&mut self, src: impl ExactSizeIterator<Item = (Vec2, Entity)>) {
+        self.data = src
+            .map(|(pos, entity)| (self.spatial_index(pos), entity))
+            .collect();
+        self.data.sort_unstable_by_key(|e| e.0);
+        self.data
+            .iter()
+            .map(|(index, _)| *index)
+            .enumerate()
+            .dedup_by(|(_, i), (_, j)| i == j)
+            .for_each(|(group_index, spatial_index)| {
+                self.grid[spatial_index] = group_index;
+            });
+    }
+
+    fn width(&self) -> u32 {
+        self.rect.dest.x
+    }
+
+    fn scale(&self) -> IVec2 {
+        self.rect.scale.floor().as_ivec2()
+    }
+
+    fn translation(&self) -> IVec2 {
+        self.rect.translation.floor().as_ivec2()
+    }
+
+    fn spatial_index(&self, point: Vec2) -> usize {
+        let UVec2 { x: column, y: row } = ((point.as_ivec2() * self.scale()) + self.translation())
+            .as_uvec2()
+            .min(self.size() - 1);
+        (row * self.width() + column) as usize
+    }
+}
+
+///////////////////////////////////////////////////////
+///////////////////////////////////////////////////////
+
 #[derive(Reflect)]
 pub struct SpatialGridBoid {
     pub entity: Entity,
@@ -225,7 +307,7 @@ impl SpatialGridCell {
         Self {
             grid_pos: (row, column).into(),
             rect: Rect::from_center_size(centre, Vec2::new(size, size)),
-            boids: Vec::with_capacity(BoidConfiguration::max_boids() as usize),
+            boids: Vec::with_capacity(SimulationConfiguration::max_boids() as usize),
         }
     }
 
@@ -355,7 +437,11 @@ impl SpatialGrid {
         assert!(
             (-half_size.x..half_size.x).contains(&world_position.x)
                 && (-half_size.y..half_size.y).contains(&world_position.y),
-            "La posición {world_position} no entra en ninguna celda del SpatialGrid"
+            "La posición {world_position} no entra en el rango [x: {}..{}, y: {}..{}]",
+            -half_size.x,
+            half_size.x,
+            -half_size.y,
+            half_size.y
         );
         let UVec2 { x: column, y: row } =
             ((world_position + half_size) / self.cell_size()).as_uvec2();

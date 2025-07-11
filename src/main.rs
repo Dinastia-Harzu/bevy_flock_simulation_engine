@@ -2,16 +2,15 @@ mod asset_related;
 mod boid_simulation;
 mod components;
 mod constants;
+mod helpers;
 mod inspector;
 mod miscellaneous;
 mod resources;
 mod states;
 mod systems;
 
-use self::{
-    boid_simulation::BoidSimulationPlugin, constants::*, inspector::*, states::*, systems::*,
-};
-use asset_related::AssetsPlugin;
+use self::{boid_simulation::*, constants::*, inspector::*, states::*, systems::*};
+use asset_related::*;
 use bevy::prelude::*;
 
 fn main() {
