@@ -211,7 +211,7 @@ impl<'a> IntoIterator for &'a BoidRules {
 pub struct UniformGrid {
     rect: CoordMapping,
     cell_size: f32,
-    data: Vec<(usize, Entity)>,
+    data: Vec<(usize, Entity, Vec2, Vec2)>,
     grid: Grid<usize>,
 }
 
@@ -229,6 +229,18 @@ impl UniformGrid {
         }
     }
 
+    pub fn cell_size(&self) -> f32 {
+        self.cell_size
+    }
+
+    pub fn mapped_point(&self, point: Vec2) -> Vec2 {
+        self.rect.map_point(point)
+    }
+
+    pub fn contains_cell(&self, cell: UVec2) -> bool {
+        cell.cmplt(self.rect.dest).all()
+    }
+
     pub fn size(&self) -> UVec2 {
         self.grid.size
     }
@@ -237,14 +249,41 @@ impl UniformGrid {
         self.rect.src.size()
     }
 
-    pub fn update(&mut self, src: impl ExactSizeIterator<Item = (Vec2, Entity)>) {
+    pub fn half_size(&self) -> Vec2 {
+        self.rect.src.half_size()
+    }
+
+    pub fn cell_data(
+        &self,
+        point: Vec2,
+    ) -> Option<impl Iterator<Item = (&'_ Entity, &'_ Vec2, &'_ Vec2)>> {
+        let index = self.spatial_index(point);
+        let start_index = self.grid[index];
+        if start_index == usize::MAX {
+            None
+        } else {
+            Some(self.data[start_index..].iter().filter_map(
+                move |(i, entity, position, velocity)| {
+                    if *i == index {
+                        Some((entity, position, velocity))
+                    } else {
+                        None
+                    }
+                },
+            ))
+        }
+    }
+
+    pub fn update(&mut self, src: impl ExactSizeIterator<Item = (Entity, Vec2, Vec2)>) {
         self.data = src
-            .map(|(pos, entity)| (self.spatial_index(pos), entity))
+            .map(|(entity, position, velocity)| {
+                (self.spatial_index(position), entity, position, velocity)
+            })
             .collect();
         self.data.sort_unstable_by_key(|e| e.0);
         self.data
             .iter()
-            .map(|(index, _)| *index)
+            .map(|i| i.0)
             .enumerate()
             .dedup_by(|(_, i), (_, j)| i == j)
             .for_each(|(group_index, spatial_index)| {
@@ -260,12 +299,12 @@ impl UniformGrid {
         self.rect.scale.floor().as_ivec2()
     }
 
-    fn translation(&self) -> IVec2 {
-        self.rect.translation.floor().as_ivec2()
+    fn offset(&self) -> IVec2 {
+        self.rect.offset.floor().as_ivec2()
     }
 
     fn spatial_index(&self, point: Vec2) -> usize {
-        let UVec2 { x: column, y: row } = ((point.as_ivec2() * self.scale()) + self.translation())
+        let UVec2 { x: column, y: row } = ((point.as_ivec2() * self.scale()) + self.offset())
             .as_uvec2()
             .min(self.size() - 1);
         (row * self.width() + column) as usize

@@ -6,7 +6,7 @@ pub struct CoordMapping {
     pub(crate) src: Rect,
     pub(crate) dest: UVec2,
     pub(crate) scale: Vec2,
-    pub(crate) translation: Vec2,
+    pub(crate) offset: Vec2,
 }
 
 impl CoordMapping {
@@ -16,8 +16,12 @@ impl CoordMapping {
             src,
             dest,
             scale,
-            translation: src.min * scale,
+            offset: src.min * scale,
         }
+    }
+
+    pub fn map_point(&self, point: Vec2) -> Vec2 {
+        ((point * self.scale) + self.offset).floor()
     }
 }
 
@@ -36,6 +40,16 @@ impl<T: Clone + Copy> Grid<T> {
     }
 }
 
+impl<T> Grid<T> {
+    pub fn columns(&self) -> u32 {
+        self.size.x
+    }
+
+    pub fn rows(&self) -> u32 {
+        self.size.y
+    }
+}
+
 impl<T: Clone + Copy> Index<usize> for Grid<T> {
     type Output = T;
 
@@ -47,5 +61,20 @@ impl<T: Clone + Copy> Index<usize> for Grid<T> {
 impl<T: Clone + Copy> IndexMut<usize> for Grid<T> {
     fn index_mut(&mut self, index: usize) -> &mut Self::Output {
         &mut self.data[index]
+    }
+}
+
+impl<T: Clone + Copy> Index<UVec2> for Grid<T> {
+    type Output = T;
+
+    fn index(&self, index: UVec2) -> &Self::Output {
+        &self.data[(index.y * self.columns() + index.x) as usize]
+    }
+}
+
+impl<T: Clone + Copy> IndexMut<UVec2> for Grid<T> {
+    fn index_mut(&mut self, index: UVec2) -> &mut Self::Output {
+        let w = self.columns();
+        &mut self.data[(index.y * w + index.x) as usize]
     }
 }
