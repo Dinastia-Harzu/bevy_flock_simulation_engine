@@ -117,6 +117,7 @@ pub fn update_boids(
             let position = translation.xy();
             let cell = spatial_grid.at_world_position(position);
             let mut velocity = Vec2::ZERO;
+
             if testing_unit.is_none()
                 || testing_unit.is_some_and(|testing_unit| testing_unit.follow_boids)
             {
@@ -129,12 +130,14 @@ pub fn update_boids(
                 let view_radius_squared = view_radius.squared();
                 let avoidance_radius = boid_configuration.scalar_parametre("avoidance_radius");
                 let avoidance_radius_squared = avoidance_radius.squared();
-                for (&other_entity, &other_position, &other_velocity) in
-                    cell.filter(|(&cell_boid, _, _)| cell_boid != entity)
+                for other_boid in cell
+                    .cell_boids()
+                    .iter()
+                    .filter(|cell_boid| cell_boid.entity != entity)
                 {
-                    let distance_squared = position.distance_squared(other_position);
-                    let r = other_position - position;
-                    if boid_predators.contains(other_entity) {
+                    let distance_squared = position.distance_squared(other_boid.position);
+                    let r = other_boid.position - position;
+                    if boid_predators.contains(other_boid.entity) {
                         if distance_squared < view_radius_squared {
                             push_force -= boid_configuration.scalar_parametre("Flee weight")
                                 * r.normalize()
@@ -150,8 +153,8 @@ pub fn update_boids(
                                     r.normalize() / distance_squared
                                 };
                         } else if distance_squared < view_radius_squared {
-                            perceived_centre += other_position;
-                            perceived_velocity += other_velocity;
+                            perceived_centre += other_boid.position;
+                            perceived_velocity += other_boid.velocity;
                             neighbours_to_follow += 1;
                         }
                     }
@@ -239,10 +242,10 @@ pub fn update_boids(
         });
 }
 
-pub fn wrap_edges(boids: Query<&mut Transform, With<Boid>>, uniform_grid: Res<UniformGrid>) {
+pub fn wrap_edges(boids: Query<&mut Transform, With<Boid>>, spatial_grid: Res<SpatialGrid>) {
     for mut transform in boids {
         let safe_offset = Vec2::splat(0.1f32);
-        let bounds = uniform_grid.half_size();
+        let bounds = spatial_grid.grid_size() / 2.0;
         let Vec2 { x: bx, y: by } = bounds - safe_offset;
         let Vec3 { x, y, .. } = &mut transform.translation;
         x.toroidal_clamp(-bx, bx);
@@ -284,7 +287,6 @@ pub fn update_debug_boid(
 
 pub fn draw_spatial_grid(
     spatial_grid: Res<SpatialGrid>,
-    uniform_grid: Res<UniformGrid>,
     simulation_configuration: Res<SimulationConfiguration>,
     mut gizmos: Gizmos,
 ) {
