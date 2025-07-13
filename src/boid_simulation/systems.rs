@@ -201,21 +201,42 @@ pub fn update_boids(
             let cell = spatial_grid.at_world_position(position);
             let mut velocity = Vec2::ZERO;
 
+            let mut push_force = Vec2::ZERO;
             let mut closest = None;
             for other_boid in cell
                 .cell_boids()
                 .iter()
-                .filter(|cell_boid| cell_boid.entity != entity && boids.contains(cell_boid.entity))
+                .filter(|cell_boid| cell_boid.entity != entity)
             {
                 let distance = position.distance(other_boid.position);
-                if distance
-                    < boid_configuration
-                        .scalar_parametre("view_radius")
-                        .min(position.distance(closest.unwrap_or(Vec2::MAX)))
-                {
-                    closest = Some(other_boid.position);
+                if boids.contains(other_boid.entity) {
+                    if distance
+                        < boid_configuration
+                            .scalar_parametre("view_radius")
+                            .min(position.distance(closest.unwrap_or(Vec2::MAX)))
+                    {
+                        closest = Some(other_boid.position);
+                    }
+                } else {
+                    let avoidance_radius_squared = boid_configuration
+                        .scalar_parametre("avoidance_radius")
+                        .squared();
+                    let distance_squared = distance.squared();
+                    let r = other_boid.position - position;
+                    if distance_squared < avoidance_radius_squared {
+                        push_force -= boid_configuration.scalar_parametre("separation_weight")
+                            * avoidance_radius_squared
+                            * if distance_squared < 0.1 {
+                                Vec2::Y
+                            } else {
+                                r.normalize() / distance_squared
+                            };
+                    }
                 }
             }
+
+            // Separation
+            velocity += push_force;
 
             // Hunt
             velocity += {
