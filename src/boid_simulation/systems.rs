@@ -14,13 +14,13 @@ pub fn spawn_boids(
     mut commands: Commands,
     boid_configuration: Res<BoidConfiguration>,
     simulation_configuration: Res<SimulationConfiguration>,
-    uniform_grid: Res<UniformGrid>,
+    spatial_grid: Res<SpatialGrid>,
     image_assets: Res<ImageAssets>,
     mut app_next_state: ResMut<NextState<SimulationState>>,
 ) {
     let mut rng = rand::rng();
     let pi = f32::consts::PI;
-    let bounds = uniform_grid.half_size();
+    let bounds = spatial_grid.grid_size() / 2.0;
     let scale = Vec3::ONE;
     for _ in 0..simulation_configuration.normal_boids {
         let angle = rng.random_range(-pi..=pi);
@@ -81,13 +81,15 @@ pub fn spawn_boids(
 
 pub fn update_spatial_grid(
     boids: Query<(Entity, &Transform, &Boid)>,
-    mut uniform_grid: ResMut<UniformGrid>,
+    mut spatial_grid: ResMut<SpatialGrid>,
 ) {
-    let mut v = Vec::with_capacity(boids.iter().len());
+    spatial_grid.clear();
     for (entity, transform, boid) in boids {
-        v.push((entity, transform.translation.xy(), boid.velocity()));
+        let position = transform.translation.xy();
+        spatial_grid
+            .at_world_position_mut(position)
+            .push(SpatialGridBoid::new(entity, position, boid.velocity()));
     }
-    uniform_grid.update(v.into_iter());
 }
 
 pub fn update_boids(
@@ -102,7 +104,6 @@ pub fn update_boids(
     boid_configuration: Res<BoidConfiguration>,
     simulation_configuration: Res<SimulationConfiguration>,
     spatial_grid: Res<SpatialGrid>,
-    uniform_grid: Res<UniformGrid>,
     time: Res<Time>,
 ) {
     boids
@@ -114,73 +115,70 @@ pub fn update_boids(
                 scale,
             } = &mut *transform;
             let position = translation.xy();
-            // let cell = spatial_grid.at_world_position(position);
+            let cell = spatial_grid.at_world_position(position);
             let mut velocity = Vec2::ZERO;
-            if let Some(cell) = uniform_grid.cell_data(position) {
-                if testing_unit.is_none()
-                    || testing_unit.is_some_and(|testing_unit| testing_unit.follow_boids)
+            if testing_unit.is_none()
+                || testing_unit.is_some_and(|testing_unit| testing_unit.follow_boids)
+            {
+                // Common
+                let mut perceived_centre = Vec2::ZERO;
+                let mut push_force = Vec2::ZERO;
+                let mut perceived_velocity = Vec2::ZERO;
+                let mut neighbours_to_follow = 0;
+                let view_radius = boid_configuration.scalar_parametre("view_radius");
+                let view_radius_squared = view_radius.squared();
+                let avoidance_radius = boid_configuration.scalar_parametre("avoidance_radius");
+                let avoidance_radius_squared = avoidance_radius.squared();
+                for (&other_entity, &other_position, &other_velocity) in
+                    cell.filter(|(&cell_boid, _, _)| cell_boid != entity)
                 {
-                    // Common
-                    let mut perceived_centre = Vec2::ZERO;
-                    let mut push_force = Vec2::ZERO;
-                    let mut perceived_velocity = Vec2::ZERO;
-                    let mut neighbours_to_follow = 0;
-                    let view_radius = boid_configuration.scalar_parametre("view_radius");
-                    let view_radius_squared = view_radius.squared();
-                    let avoidance_radius = boid_configuration.scalar_parametre("avoidance_radius");
-                    let avoidance_radius_squared = avoidance_radius.squared();
-                    for (&other_entity, &other_position, &other_velocity) in
-                        cell.filter(|(&cell_boid, _, _)| cell_boid != entity)
-                    {
-                        let distance_squared = position.distance_squared(other_position);
-                        let r = other_position - position;
-                        if boid_predators.contains(other_entity) {
-                            if distance_squared < view_radius_squared {
-                                push_force -= boid_configuration.scalar_parametre("Flee weight")
-                                    * r.normalize()
-                                    * boid.speed;
-                            }
-                        } else {
-                            if distance_squared < avoidance_radius_squared {
-                                push_force -= boid_configuration
-                                    .scalar_parametre("separation_weight")
-                                    * avoidance_radius_squared
-                                    * if distance_squared < 0.1 {
-                                        Vec2::Y
-                                    } else {
-                                        r.normalize() / distance_squared
-                                    };
-                            } else if distance_squared < view_radius_squared {
-                                perceived_centre += other_position;
-                                perceived_velocity += other_velocity;
-                                neighbours_to_follow += 1;
-                            }
+                    let distance_squared = position.distance_squared(other_position);
+                    let r = other_position - position;
+                    if boid_predators.contains(other_entity) {
+                        if distance_squared < view_radius_squared {
+                            push_force -= boid_configuration.scalar_parametre("Flee weight")
+                                * r.normalize()
+                                * boid.speed;
+                        }
+                    } else {
+                        if distance_squared < avoidance_radius_squared {
+                            push_force -= boid_configuration.scalar_parametre("separation_weight")
+                                * avoidance_radius_squared
+                                * if distance_squared < 0.1 {
+                                    Vec2::Y
+                                } else {
+                                    r.normalize() / distance_squared
+                                };
+                        } else if distance_squared < view_radius_squared {
+                            perceived_centre += other_position;
+                            perceived_velocity += other_velocity;
+                            neighbours_to_follow += 1;
                         }
                     }
-                    if neighbours_to_follow > 1 {
-                        let neighbours_to_follow = neighbours_to_follow as f32;
-                        perceived_centre /= neighbours_to_follow;
-                        perceived_velocity /= neighbours_to_follow;
-                    }
-
-                    // Cohesion
-                    velocity += (perceived_centre - position)
-                        * boid_configuration.scalar_parametre("cohesion_weight");
-
-                    // Separation
-                    velocity += push_force;
-
-                    // Alignment
-                    velocity += (perceived_velocity - velocity)
-                        * boid_configuration.scalar_parametre("alignment_weight");
-
-                    // Strong wind
-                    velocity += Vec2::from_angle(
-                        boid_configuration
-                            .scalar_parametre("wind_angle")
-                            .to_radians(),
-                    ) * boid_configuration.scalar_parametre("wind_speed");
                 }
+                if neighbours_to_follow > 1 {
+                    let neighbours_to_follow = neighbours_to_follow as f32;
+                    perceived_centre /= neighbours_to_follow;
+                    perceived_velocity /= neighbours_to_follow;
+                }
+
+                // Cohesion
+                velocity += (perceived_centre - position)
+                    * boid_configuration.scalar_parametre("cohesion_weight");
+
+                // Separation
+                velocity += push_force;
+
+                // Alignment
+                velocity += (perceived_velocity - velocity)
+                    * boid_configuration.scalar_parametre("alignment_weight");
+
+                // Strong wind
+                velocity += Vec2::from_angle(
+                    boid_configuration
+                        .scalar_parametre("wind_angle")
+                        .to_radians(),
+                ) * boid_configuration.scalar_parametre("wind_speed");
             }
 
             boid.add_velocity(velocity, &boid_configuration);
