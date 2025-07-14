@@ -63,14 +63,16 @@ pub struct BoidPredator;
 #[derive(Component)]
 pub struct WindCurrent {
     pub wind_speed: f32,
+    pub radius: f32,
     pub trajectory: CubicBezier<Vec2>,
     pub resolution: usize,
 }
 
 impl WindCurrent {
-    pub fn new(speed: f32, control_points: [Vec2; 4]) -> Self {
+    pub fn new(speed: f32, radius: f32, control_points: [Vec2; 4]) -> Self {
         Self {
             wind_speed: speed,
+            radius,
             trajectory: CubicBezier::new([control_points]),
             resolution: 100,
         }
@@ -86,5 +88,21 @@ impl WindCurrent {
 
     pub fn control_points(&self) -> &[Vec2] {
         &self.trajectory.control_points[0]
+    }
+
+    pub fn closest(&self, position: Vec2) -> (f32, Vec2) {
+        let curve = self.curve();
+        let mut closest_t = 0.0f32;
+        let mut closest_distance = None;
+        for i in 0..self.resolution {
+            let t = i as f32 / self.resolution as f32;
+            let q = curve.position(t);
+            let distance = position.distance(q);
+            if distance < self.radius.min(closest_distance.unwrap_or(f32::MAX)) {
+                closest_distance = Some(distance);
+                closest_t = t;
+            }
+        }
+        (closest_t, curve.position(closest_t))
     }
 }

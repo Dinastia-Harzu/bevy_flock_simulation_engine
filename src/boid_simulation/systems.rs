@@ -82,6 +82,7 @@ pub fn spawn_wind_currents(mut commands: Commands) {
         Name::from("Wind current"),
         WindCurrent::new(
             10.0,
+            100.0,
             [
                 vec2(-10.0, -200.0),
                 vec2(30.0, 20.0),
@@ -118,6 +119,7 @@ pub fn update_boids(
         (Entity, &mut Boid, &mut Transform),
         (With<BoidPredator>, Without<BoidTestingUnit>),
     >,
+    wind_currents: Query<&WindCurrent>,
     boid_configuration: Res<BoidConfiguration>,
     simulation_configuration: Res<SimulationConfiguration>,
     spatial_grid: Res<SpatialGrid>,
@@ -199,6 +201,13 @@ pub fn update_boids(
                         .scalar_parametre("wind_angle")
                         .to_radians(),
                 ) * boid_configuration.scalar_parametre("wind_speed");
+
+                // Wind currents
+                for wind_current in wind_currents {
+                    let (t, _) = wind_current.closest(position);
+                    let curve = wind_current.curve();
+                    velocity += curve.velocity(t).normalize_or_zero() * wind_current.wind_speed;
+                }
             }
 
             boid.add_velocity(velocity, &boid_configuration);
@@ -341,8 +350,11 @@ pub fn draw_spatial_grid(
 pub fn draw_wind_currents(wind_currents: Query<&WindCurrent>, mut gizmos: Gizmos) {
     for wind_current in wind_currents {
         let curve = wind_current.curve();
-        for &point in wind_current.control_points() {
+        for (i, &point) in wind_current.control_points().iter().enumerate() {
             gizmos.circle_2d(point, 10.0, YELLOW);
+            if i == 0 {
+                gizmos.circle_2d(point, wind_current.radius, PURPLE);
+            }
         }
         for (start, end) in curve
             .iter_positions(wind_current.arrow_resolution())
