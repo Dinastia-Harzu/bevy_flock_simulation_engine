@@ -18,15 +18,11 @@ impl Plugin for BoidSimulationPlugin {
             .insert_resource(UniformGrid::new(Vec2::ZERO, 480.0, 2, 4))
             .insert_resource(SimulationConfiguration::default())
             .register_type::<Boid>()
+            .register_type::<WindCurrent>()
             .add_systems(Startup, setup_rules)
             .add_systems(
                 PreUpdate,
-                (
-                    clear_simulation,
-                    spawn_boids,
-                    spawn_wind_currents,
-                    on_finish_spawning,
-                )
+                (clear_simulation, setup_simulation)
                     .chain()
                     .run_if(in_state(SimulationState::Setup).and(in_state(AppState::Running))),
             )
@@ -34,9 +30,6 @@ impl Plugin for BoidSimulationPlugin {
                 FixedUpdate,
                 (update_spatial_grid, update_boids, wrap_edges).chain(),
             )
-            .add_systems(
-                PostUpdate,
-                (update_debug_boid, draw_spatial_grid, draw_wind_currents),
-            );
+            .add_systems(PostUpdate, (update_debug_boid, draw_debug));
     }
 }

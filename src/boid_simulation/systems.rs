@@ -5,18 +5,26 @@ use core::f32;
 use itertools::Itertools;
 use rand::Rng;
 
-pub fn clear_simulation(mut commands: Commands, boids: Query<Entity, With<Boid>>) {
+pub fn clear_simulation(
+    mut commands: Commands,
+    boids: Query<Entity, With<Boid>>,
+    wind_currents: Query<Entity, With<WindCurrent>>,
+) {
     for entity in boids {
+        commands.entity(entity).despawn();
+    }
+    for entity in wind_currents {
         commands.entity(entity).despawn();
     }
 }
 
-pub fn spawn_boids(
+pub fn setup_simulation(
     mut commands: Commands,
     boid_configuration: Res<BoidConfiguration>,
     simulation_configuration: Res<SimulationConfiguration>,
     spatial_grid: Res<SpatialGrid>,
     image_assets: Res<ImageAssets>,
+    mut app_next_state: ResMut<NextState<SimulationState>>,
 ) {
     let mut rng = rand::rng();
     let pi = f32::consts::PI;
@@ -75,13 +83,12 @@ pub fn spawn_boids(
             BoidPredator,
         ));
     }
-}
 
-pub fn spawn_wind_currents(mut commands: Commands) {
+    // Wind currents
     commands.spawn((
         Name::from("Wind current"),
         WindCurrent::new(
-            10.0,
+            100.0,
             100.0,
             [
                 vec2(-10.0, -200.0),
@@ -91,9 +98,8 @@ pub fn spawn_wind_currents(mut commands: Commands) {
             ],
         ),
     ));
-}
 
-pub fn on_finish_spawning(mut app_next_state: ResMut<NextState<SimulationState>>) {
+    // Switch to next state
     app_next_state.set(SimulationState::Running);
 }
 
@@ -136,6 +142,7 @@ pub fn update_boids(
             let position = translation.xy();
             let cell = spatial_grid.at_world_position(position);
             let mut velocity = Vec2::ZERO;
+            let mut offset_velocity = Vec2::ZERO;
 
             if testing_unit.is_none()
                 || testing_unit.is_some_and(|testing_unit| testing_unit.follow_boids)
@@ -196,7 +203,7 @@ pub fn update_boids(
                     * boid_configuration.scalar_parametre("alignment_weight");
 
                 // Strong wind
-                velocity += Vec2::from_angle(
+                offset_velocity += Vec2::from_angle(
                     boid_configuration
                         .scalar_parametre("wind_angle")
                         .to_radians(),
@@ -204,14 +211,16 @@ pub fn update_boids(
 
                 // Wind currents
                 for wind_current in wind_currents {
-                    let (t, _) = wind_current.closest(position);
-                    let curve = wind_current.curve();
-                    velocity += curve.velocity(t).normalize_or_zero() * wind_current.wind_speed;
+                    if let Some((t, distance, _)) = wind_current.closest(position) {
+                        let curve = wind_current.curve();
+                        offset_velocity +=
+                            curve.velocity(t).normalize_or_zero() * wind_current.wind_speed;
+                    }
                 }
             }
 
             boid.add_velocity(velocity, &boid_configuration);
-            *translation += boid.velocity().extend(0.0) * time.delta_secs();
+            *translation += (boid.velocity() + offset_velocity).extend(0.0) * time.delta_secs();
             *rotation = Quat::from_axis_angle(Vec3::Z, boid.angle);
             *scale = Vec2::splat(boid_configuration.scale).extend(1.0);
         });
@@ -226,6 +235,7 @@ pub fn update_boids(
             let position = translation.xy();
             let cell = spatial_grid.at_world_position(position);
             let mut velocity = Vec2::ZERO;
+            let mut offset_velocity = Vec2::ZERO;
 
             let mut push_force = Vec2::ZERO;
             let mut closest = None;
@@ -276,14 +286,23 @@ pub fn update_boids(
             };
 
             // Strong wind
-            velocity += Vec2::from_angle(
+            offset_velocity += Vec2::from_angle(
                 boid_configuration
                     .scalar_parametre("wind_angle")
                     .to_radians(),
             ) * boid_configuration.scalar_parametre("wind_speed");
 
+            // Wind currents
+            for wind_current in wind_currents {
+                if let Some((t, distance, _)) = wind_current.closest(position) {
+                    let curve = wind_current.curve();
+                    offset_velocity +=
+                        curve.velocity(t).normalize_or_zero() * wind_current.wind_speed;
+                }
+            }
+
             boid.add_velocity(velocity, &boid_configuration);
-            *translation += boid.velocity().extend(0.0) * time.delta_secs();
+            *translation += (boid.velocity() + offset_velocity).extend(0.0) * time.delta_secs();
             *rotation = Quat::from_axis_angle(Vec3::Z, boid.angle);
             *scale = Vec2::splat(boid_configuration.scale).extend(1.0);
         });
@@ -332,7 +351,8 @@ pub fn update_debug_boid(
         .resolution(64);
 }
 
-pub fn draw_spatial_grid(
+pub fn draw_debug(
+    wind_currents: Query<&WindCurrent>,
     spatial_grid: Res<SpatialGrid>,
     simulation_configuration: Res<SimulationConfiguration>,
     mut gizmos: Gizmos,
@@ -345,9 +365,6 @@ pub fn draw_spatial_grid(
     for cell in spatial_grid.cells() {
         gizmos.rect_2d(cell.location(), Vec2::new(cell_size, cell_size), WHITE);
     }
-}
-
-pub fn draw_wind_currents(wind_currents: Query<&WindCurrent>, mut gizmos: Gizmos) {
     for wind_current in wind_currents {
         let curve = wind_current.curve();
         for (i, &point) in wind_current.control_points().iter().enumerate() {

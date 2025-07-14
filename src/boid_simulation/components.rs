@@ -1,7 +1,7 @@
 use std::usize;
 
 use super::resources::*;
-use bevy::prelude::*;
+use bevy::{math::FloatPow, prelude::*};
 
 #[derive(Component, Clone, Copy, Default, Reflect)]
 #[reflect(Component)]
@@ -60,7 +60,8 @@ impl Default for BoidTestingUnit {
 #[derive(Component)]
 pub struct BoidPredator;
 
-#[derive(Component)]
+#[derive(Component, Clone, Reflect)]
+#[reflect(Component)]
 pub struct WindCurrent {
     pub wind_speed: f32,
     pub radius: f32,
@@ -90,19 +91,21 @@ impl WindCurrent {
         &self.trajectory.control_points[0]
     }
 
-    pub fn closest(&self, position: Vec2) -> (f32, Vec2) {
+    pub fn closest(&self, position: Vec2) -> Option<(f32, f32, Vec2)> {
         let curve = self.curve();
         let mut closest_t = 0.0f32;
         let mut closest_distance = None;
         for i in 0..self.resolution {
             let t = i as f32 / self.resolution as f32;
-            let q = curve.position(t);
-            let distance = position.distance(q);
+            let distance = position.distance(curve.position(t));
             if distance < self.radius.min(closest_distance.unwrap_or(f32::MAX)) {
                 closest_distance = Some(distance);
                 closest_t = t;
             }
         }
-        (closest_t, curve.position(closest_t))
+        match closest_distance {
+            Some(distance) => Some((closest_t, distance, curve.position(closest_t))),
+            None => None,
+        }
     }
 }
