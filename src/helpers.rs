@@ -1,5 +1,76 @@
 use bevy::prelude::*;
-use std::ops::{Index, IndexMut};
+use std::{
+    fmt::Debug,
+    ops::{Index, IndexMut},
+};
+
+use crate::boid_simulation::resources::SimulationConfiguration;
+
+#[derive(Reflect)]
+pub struct SpatialGridBoid {
+    pub entity: Entity,
+    pub position: Vec2,
+    pub velocity: Vec2,
+}
+
+impl SpatialGridBoid {
+    pub fn new(entity: Entity, position: Vec2, velocity: Vec2) -> Self {
+        Self {
+            entity,
+            position,
+            velocity,
+        }
+    }
+}
+
+pub(crate) type CellBoids = Vec<SpatialGridBoid>;
+pub(crate) type Cells = Vec<SpatialGridCell>;
+
+#[derive(Reflect)]
+pub struct SpatialGridCell {
+    pub(crate) grid_pos: UVec2,
+    pub(crate) rect: Rect,
+    pub(crate) boids: CellBoids,
+}
+
+impl SpatialGridCell {
+    pub fn new(row: u32, column: u32, size: f32, centre: Vec2) -> Self {
+        Self {
+            grid_pos: (row, column).into(),
+            rect: Rect::from_center_size(centre, Vec2::new(size, size)),
+            boids: Vec::with_capacity(SimulationConfiguration::max_boids() as usize),
+        }
+    }
+
+    pub fn push(&mut self, boid: SpatialGridBoid) {
+        self.boids.push(boid);
+    }
+
+    pub fn size(&self) -> f32 {
+        self.rect.size().x
+    }
+
+    pub fn location(&self) -> Vec2 {
+        self.rect.center()
+    }
+
+    pub fn cell_boids(&self) -> &CellBoids {
+        &self.boids
+    }
+
+    pub fn contains(&self, location: Vec2) -> bool {
+        self.rect.contains(location)
+    }
+}
+
+impl Debug for SpatialGridCell {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        writeln!(f, "{} boids", self.boids.len())
+    }
+}
+
+///////////////////////////////////////////////////////
+///////////////////////////////////////////////////////
 
 #[derive(Debug, Clone, Copy)]
 pub struct CoordMapping {

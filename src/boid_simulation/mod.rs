@@ -14,7 +14,7 @@ impl Plugin for BoidSimulationPlugin {
         app.init_state::<SimulationState>()
             .init_resource::<BoidRules>()
             .insert_resource(BoidConfiguration::default())
-            .insert_resource(SpatialGrid::new(9, 16, 115.0))
+            .insert_resource(SpatialGrid::with_cell_size(200.0))
             .insert_resource(SimulationConfiguration::default())
             .register_type::<Boid>()
             .register_type::<WindCurrent>()

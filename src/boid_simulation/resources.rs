@@ -1,4 +1,4 @@
-use crate::helpers::*;
+use crate::{constants::SCREEN_SIZE, helpers::*};
 use bevy::prelude::*;
 use bevy_inspector_egui::prelude::*;
 use itertools::Itertools;
@@ -314,69 +314,6 @@ impl UniformGrid {
 ///////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////
 
-#[derive(Reflect)]
-pub struct SpatialGridBoid {
-    pub entity: Entity,
-    pub position: Vec2,
-    pub velocity: Vec2,
-}
-
-impl SpatialGridBoid {
-    pub fn new(entity: Entity, position: Vec2, velocity: Vec2) -> Self {
-        Self {
-            entity,
-            position,
-            velocity,
-        }
-    }
-}
-
-type CellBoids = Vec<SpatialGridBoid>;
-type Cells = Vec<SpatialGridCell>;
-
-#[derive(Reflect)]
-pub struct SpatialGridCell {
-    grid_pos: UVec2,
-    rect: Rect,
-    boids: CellBoids,
-}
-
-impl SpatialGridCell {
-    fn new(row: u32, column: u32, size: f32, centre: Vec2) -> Self {
-        Self {
-            grid_pos: (row, column).into(),
-            rect: Rect::from_center_size(centre, Vec2::new(size, size)),
-            boids: Vec::with_capacity(SimulationConfiguration::max_boids() as usize),
-        }
-    }
-
-    pub fn push(&mut self, boid: SpatialGridBoid) {
-        self.boids.push(boid);
-    }
-
-    pub fn size(&self) -> f32 {
-        self.rect.size().x
-    }
-
-    pub fn location(&self) -> Vec2 {
-        self.rect.center()
-    }
-
-    pub fn cell_boids(&self) -> &CellBoids {
-        &self.boids
-    }
-
-    pub fn contains(&self, location: Vec2) -> bool {
-        self.rect.contains(location)
-    }
-}
-
-impl Debug for SpatialGridCell {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        writeln!(f, "{} boids", self.boids.len())
-    }
-}
-
 #[derive(Resource, Reflect, InspectorOptions)]
 #[reflect(Resource, InspectorOptions)]
 pub struct SpatialGrid {
@@ -389,7 +326,11 @@ impl SpatialGrid {
     pub fn new(rows: u32, columns: u32, cell_size: f32) -> Self {
         assert!(
             rows > 0 && columns > 0,
-            "Prohibido crear un SpatialGrid unidimensional o nildimensional"
+            "Prohibido crear un SpatialGrid unidimensional o nildimensional o de dimensiones negativas"
+        );
+        assert!(
+            cell_size > 1.0,
+            "Es inútil trabajar con celdas más pequeñas que un píxel"
         );
         let mut cells = Vec::new();
         let offset = Vec2::new((columns - 1) as f32, (rows - 1) as f32) / 2.0;
@@ -408,6 +349,18 @@ impl SpatialGrid {
             rows,
             columns,
         }
+    }
+
+    pub fn with_cell_size(cell_size: f32) -> Self {
+        assert!(
+            cell_size > 1.0,
+            "Es inútil trabajar con celdas más pequeñas que un píxel"
+        );
+        let UVec2 {
+            x: columns,
+            y: rows,
+        } = (SCREEN_SIZE / cell_size).floor().as_uvec2();
+        Self::new(rows, columns, cell_size)
     }
 
     pub fn cells(&self) -> &Cells {
