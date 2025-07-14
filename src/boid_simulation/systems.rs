@@ -2,6 +2,7 @@ use super::{components::*, resources::*};
 use crate::{asset_related::resources::*, miscellaneous::*, states::*};
 use bevy::{color::palettes::css::*, math::FloatPow, prelude::*};
 use core::f32;
+use itertools::Itertools;
 use rand::Rng;
 
 pub fn clear_simulation(mut commands: Commands, boids: Query<Entity, With<Boid>>) {
@@ -16,7 +17,6 @@ pub fn spawn_boids(
     simulation_configuration: Res<SimulationConfiguration>,
     spatial_grid: Res<SpatialGrid>,
     image_assets: Res<ImageAssets>,
-    mut app_next_state: ResMut<NextState<SimulationState>>,
 ) {
     let mut rng = rand::rng();
     let pi = f32::consts::PI;
@@ -75,7 +75,24 @@ pub fn spawn_boids(
             BoidPredator,
         ));
     }
+}
 
+pub fn spawn_wind_currents(mut commands: Commands) {
+    commands.spawn((
+        Name::from("Wind current"),
+        WindCurrent::new(
+            10.0,
+            [
+                vec2(-10.0, -200.0),
+                vec2(30.0, 20.0),
+                vec2(350.0, 30.0),
+                vec2(390.0, 80.0),
+            ],
+        ),
+    ));
+}
+
+pub fn on_finish_spawning(mut app_next_state: ResMut<NextState<SimulationState>>) {
     app_next_state.set(SimulationState::Running);
 }
 
@@ -318,5 +335,20 @@ pub fn draw_spatial_grid(
     let cell_size = spatial_grid.cell_size();
     for cell in spatial_grid.cells() {
         gizmos.rect_2d(cell.location(), Vec2::new(cell_size, cell_size), WHITE);
+    }
+}
+
+pub fn draw_wind_currents(wind_currents: Query<&WindCurrent>, mut gizmos: Gizmos) {
+    for wind_current in wind_currents {
+        let curve = wind_current.curve();
+        for &point in wind_current.control_points() {
+            gizmos.circle_2d(point, 10.0, YELLOW);
+        }
+        for (start, end) in curve
+            .iter_positions(wind_current.arrow_resolution())
+            .tuple_windows::<(_, _)>()
+        {
+            gizmos.arrow_2d(start, end, WHITE);
+        }
     }
 }

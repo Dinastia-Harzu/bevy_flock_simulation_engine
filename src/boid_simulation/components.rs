@@ -1,3 +1,5 @@
+use std::usize;
+
 use super::resources::*;
 use bevy::prelude::*;
 
@@ -57,3 +59,32 @@ impl Default for BoidTestingUnit {
 
 #[derive(Component)]
 pub struct BoidPredator;
+
+#[derive(Component)]
+pub struct WindCurrent {
+    pub wind_speed: f32,
+    pub trajectory: CubicBezier<Vec2>,
+    pub resolution: usize,
+}
+
+impl WindCurrent {
+    pub fn new(speed: f32, control_points: [Vec2; 4]) -> Self {
+        Self {
+            wind_speed: speed,
+            trajectory: CubicBezier::new([control_points]),
+            resolution: 100,
+        }
+    }
+
+    pub fn arrow_resolution(&self) -> usize {
+        (self.resolution as f32).sqrt().floor() as usize
+    }
+
+    pub fn curve(&self) -> CubicCurve<Vec2> {
+        self.trajectory.to_curve().unwrap()
+    }
+
+    pub fn control_points(&self) -> &[Vec2] {
+        &self.trajectory.control_points[0]
+    }
+}

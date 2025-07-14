@@ -21,7 +21,12 @@ impl Plugin for BoidSimulationPlugin {
             .add_systems(Startup, setup_rules)
             .add_systems(
                 PreUpdate,
-                (clear_simulation, spawn_boids)
+                (
+                    clear_simulation,
+                    spawn_boids,
+                    spawn_wind_currents,
+                    on_finish_spawning,
+                )
                     .chain()
                     .run_if(in_state(SimulationState::Setup).and(in_state(AppState::Running))),
             )
@@ -29,6 +34,9 @@ impl Plugin for BoidSimulationPlugin {
                 FixedUpdate,
                 (update_spatial_grid, update_boids, wrap_edges).chain(),
             )
-            .add_systems(PostUpdate, (update_debug_boid, draw_spatial_grid));
+            .add_systems(
+                PostUpdate,
+                (update_debug_boid, draw_spatial_grid, draw_wind_currents),
+            );
     }
 }
