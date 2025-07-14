@@ -1,4 +1,4 @@
-use crate::{constants::SCREEN_SIZE, helpers::*};
+use crate::{constants::SCREEN_SIZE, helpers::*, miscellaneous::ToroidalClamp};
 use bevy::prelude::*;
 use bevy_inspector_egui::prelude::*;
 use itertools::Itertools;
@@ -393,6 +393,10 @@ impl SpatialGrid {
         }
     }
 
+    pub fn iter_radius(&self, centre: Vec2, radius: f32) -> SpatialGridInRadiusIter {
+        SpatialGridInRadiusIter::new(self, centre, radius)
+    }
+
     #[must_use = "No vas a usar este SpatialGridCell?"]
     pub fn at(&self, row: usize, column: usize) -> &SpatialGridCell {
         &self.cells[row * self.columns as usize + column]
@@ -403,6 +407,10 @@ impl SpatialGrid {
         &mut self.cells[row * self.columns as usize + column]
     }
 
+    pub fn get(&self, row: usize, column: usize) -> Option<&SpatialGridCell> {
+        self.cells.get(row * self.columns as usize + column)
+    }
+
     #[must_use = "No vas a usar este SpatialGridCell?"]
     pub fn at_world_position(&self, world_position: Vec2) -> &SpatialGridCell {
         self.at_index(self.index_from_world_position(world_position))
@@ -411,6 +419,13 @@ impl SpatialGrid {
     #[must_use = "No vas a usar este SpatialGridCell?"]
     pub fn at_world_position_mut(&mut self, world_position: Vec2) -> &mut SpatialGridCell {
         self.at_index_mut(self.index_from_world_position(world_position))
+    }
+
+    pub fn try_at_world_position(&self, world_position: Vec2) -> Option<&SpatialGridCell> {
+        match self.try_index_from_world_position(world_position) {
+            Ok(index) => Some(self.at_index(index)),
+            Err(_) => None,
+        }
     }
 
     #[must_use = "No vas a usar este SpatialGridCell?"]
@@ -424,22 +439,27 @@ impl SpatialGrid {
     }
 
     pub fn index_from_world_position(&self, world_position: Vec2) -> usize {
+        self.try_index_from_world_position(world_position).unwrap()
+    }
+
+    pub fn try_index_from_world_position(&self, world_position: Vec2) -> Result<usize, String> {
         let total_cells = self.rows * self.columns;
         let half_size = self.grid_size() / 2.0;
-        assert!(
-            (-half_size.x..half_size.x).contains(&world_position.x)
-                && (-half_size.y..half_size.y).contains(&world_position.y),
-            "La posición {world_position} no entra en el rango [x: {}..{}, y: {}..{}]",
-            -half_size.x,
-            half_size.x,
-            -half_size.y,
-            half_size.y
-        );
+        if !(-half_size.x..half_size.x).contains(&world_position.x)
+            || !(-half_size.y..half_size.y).contains(&world_position.y)
+        {
+            return Err(format!(
+                "La posición {world_position} no entra en el rango [x: {}..{}, y: {}..{}]",
+                -half_size.x, half_size.x, -half_size.y, half_size.y
+            ));
+        }
         let UVec2 { x: column, y: row } =
             ((world_position + half_size) / self.cell_size()).as_uvec2();
         let i = row * self.columns + column;
-        assert!(i < total_cells, "La conversión posición global ({world_position}) -> índice debe dar menor que {total_cells}, pero ha dado {row} * {} + {column} = {i}", self.columns);
-        i as usize
+        if i >= total_cells {
+            return Err(format!("La conversión posición global ({world_position}) -> índice debe dar menor que {total_cells}, pero ha dado {row} * {} + {column} = {i}", self.columns));
+        }
+        Ok(i as usize)
     }
 }
 
@@ -456,5 +476,57 @@ impl Debug for SpatialGrid {
             )?;
         }
         Ok(())
+    }
+}
+
+pub struct SpatialGridInRadiusIter<'g> {
+    spatial_grid: &'g SpatialGrid,
+    centre: Vec2,
+    radius: f32,
+    index: UVec2,
+    index_ranges: (RangeInclusive<u32>, RangeInclusive<u32>),
+}
+
+impl<'g> SpatialGridInRadiusIter<'g> {
+    pub fn new(spatial_grid: &'g SpatialGrid, centre: Vec2, radius: f32) -> Self {
+        let inf = centre - radius;
+        let sup = centre + radius;
+        let inf_index = (inf / spatial_grid.cell_size()).floor().as_uvec2();
+        let sup_index = (sup / spatial_grid.cell_size()).floor().as_uvec2();
+        let index_ranges = (inf_index.x..=sup_index.x, inf_index.y..=sup_index.y);
+        Self {
+            spatial_grid,
+            centre,
+            radius,
+            index: inf_index,
+            index_ranges,
+        }
+    }
+}
+
+impl<'g> Iterator for SpatialGridInRadiusIter<'g> {
+    type Item = &'g SpatialGridCell;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let (x_range, y_range) = &self.index_ranges;
+        let oob_x = !x_range.contains(&self.index.x);
+        let oob_y = !y_range.contains(&self.index.y);
+        if oob_x && oob_y {
+            return None;
+        }
+        let cell = self
+            .spatial_grid
+            .get(self.index.y as usize, self.index.x as usize);
+        if oob_x {
+            self.index.x = *x_range.start();
+        } else {
+            self.index.x += 1;
+        }
+        if oob_y {
+            self.index.y = *y_range.start();
+        } else {
+            self.index.y += 1;
+        }
+        cell
     }
 }

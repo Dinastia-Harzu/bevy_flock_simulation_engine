@@ -136,7 +136,6 @@ pub fn update_boids(
                 scale,
             } = &mut *transform;
             let position = translation.xy();
-            let cell = spatial_grid.at_world_position(position);
             let mut velocity = Vec2::ZERO;
             let mut offset_velocity = Vec2::ZERO;
 
@@ -152,32 +151,36 @@ pub fn update_boids(
                 let view_radius_squared = view_radius.squared();
                 let avoidance_radius = boid_configuration.scalar_parametre("avoidance_radius");
                 let avoidance_radius_squared = avoidance_radius.squared();
-                for other_boid in cell
-                    .cell_boids()
-                    .iter()
-                    .filter(|cell_boid| cell_boid.entity != entity)
-                {
-                    let distance_squared = position.distance_squared(other_boid.position);
-                    let r = other_boid.position - position;
-                    if boid_predators.contains(other_boid.entity) {
-                        if distance_squared < view_radius_squared {
-                            push_force -= boid_configuration.scalar_parametre("Flee weight")
-                                * r.normalize()
-                                * boid.speed;
-                        }
-                    } else {
-                        if distance_squared < avoidance_radius_squared {
-                            push_force -= boid_configuration.scalar_parametre("separation_weight")
-                                * avoidance_radius_squared
-                                * if distance_squared < 0.1 {
-                                    Vec2::Y
-                                } else {
-                                    r.normalize() / distance_squared
-                                };
-                        } else if distance_squared < view_radius_squared {
-                            perceived_centre += other_boid.position;
-                            perceived_velocity += other_boid.velocity;
-                            neighbours_to_follow += 1;
+                let cell = spatial_grid.at_world_position(position);
+                for cell in spatial_grid.iter_radius(position, view_radius) {
+                    for other_boid in cell
+                        .cell_boids()
+                        .iter()
+                        .filter(|cell_boid| cell_boid.entity != entity)
+                    {
+                        let distance_squared = position.distance_squared(other_boid.position);
+                        let r = other_boid.position - position;
+                        if boid_predators.contains(other_boid.entity) {
+                            if distance_squared < view_radius_squared {
+                                push_force -= boid_configuration.scalar_parametre("Flee weight")
+                                    * r.normalize()
+                                    * boid.speed;
+                            }
+                        } else {
+                            if distance_squared < avoidance_radius_squared {
+                                push_force -= boid_configuration
+                                    .scalar_parametre("separation_weight")
+                                    * avoidance_radius_squared
+                                    * if distance_squared < 0.1 {
+                                        Vec2::Y
+                                    } else {
+                                        r.normalize() / distance_squared
+                                    };
+                            } else if distance_squared < view_radius_squared {
+                                perceived_centre += other_boid.position;
+                                perceived_velocity += other_boid.velocity;
+                                neighbours_to_follow += 1;
+                            }
                         }
                     }
                 }
