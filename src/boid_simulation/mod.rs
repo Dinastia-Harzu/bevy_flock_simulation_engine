@@ -13,9 +13,9 @@ impl Plugin for BoidSimulationPlugin {
     fn build(&self, app: &mut App) {
         app.init_state::<SimulationState>()
             .init_resource::<BoidRules>()
-            .insert_resource(BoidConfiguration::default())
+            .init_resource::<BoidConfiguration>()
+            .init_resource::<SimulationConfiguration>()
             .insert_resource(SpatialGrid::with_cell_size(200.0))
-            .insert_resource(SimulationConfiguration::default())
             .register_type::<Boid>()
             .register_type::<WindCurrent>()
             .add_systems(Startup, setup_rules)

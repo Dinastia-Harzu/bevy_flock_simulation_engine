@@ -7,13 +7,9 @@ use rand::Rng;
 
 pub fn clear_simulation(
     mut commands: Commands,
-    boids: Query<Entity, With<Boid>>,
-    wind_currents: Query<Entity, With<WindCurrent>>,
+    simulation_entities: Query<Entity, Or<(With<Boid>, With<WindCurrent>)>>,
 ) {
-    for entity in boids {
-        commands.entity(entity).despawn();
-    }
-    for entity in wind_currents {
+    for entity in simulation_entities {
         commands.entity(entity).despawn();
     }
 }
