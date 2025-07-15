@@ -153,7 +153,6 @@ pub fn update_boids(
                 let view_radius_squared = view_radius.squared();
                 let avoidance_radius = boid_configuration.scalar_parametre("avoidance_radius");
                 let avoidance_radius_squared = avoidance_radius.squared();
-                // let cell = spatial_grid.at_world_position(position);
                 for cell in spatial_grid.iter_radius(position, view_radius) {
                     for other_boid in cell
                         .cell_boids()
@@ -236,42 +235,43 @@ pub fn update_boids(
                 scale,
             } = &mut *transform;
             let position = translation.xy();
-            let cell = spatial_grid.at_world_position(position);
             let mut velocity = Vec2::ZERO;
             let mut offset_velocity = Vec2::ZERO;
 
             let mut push_force = Vec2::ZERO;
             let mut closest = None;
-            for other_boid in cell
-                .cell_boids()
-                .iter()
-                .filter(|cell_boid| cell_boid.entity != entity)
-            {
-                let distance = position.distance(other_boid.position);
-                if boids.contains(other_boid.entity) {
-                    if distance
-                        < boid_configuration
-                            .scalar_parametre("view_radius")
-                            .min(position.distance(closest.unwrap_or(Vec2::MAX)))
-                    {
-                        closest = Some(other_boid.position);
-                    }
-                } else {
-                    let avoidance_radius_squared = boid_configuration
-                        .scalar_parametre("avoidance_radius")
-                        .squared();
-                    let distance_squared = distance.squared();
-                    let r = other_boid.position - position;
-                    if distance_squared < avoidance_radius_squared {
-                        push_force -= (boid_configuration.scalar_parametre("separation_weight")
-                            * avoidance_radius_squared
-                            * r.normalize_or(boid.velocity())
-                            / if distance_squared < 0.1 {
-                                1.0
-                            } else {
-                                distance_squared
-                            })
-                        .clamp_length_max(avoidance_radius_squared);
+            let view_radius = boid_configuration.scalar_parametre("view_radius");
+            for cell in spatial_grid.iter_radius(position, view_radius) {
+                for other_boid in cell
+                    .cell_boids()
+                    .iter()
+                    .filter(|cell_boid| cell_boid.entity != entity)
+                {
+                    let distance = position.distance(other_boid.position);
+                    if boids.contains(other_boid.entity) {
+                        if distance
+                            < view_radius.min(position.distance(closest.unwrap_or(Vec2::MAX)))
+                        {
+                            closest = Some(other_boid.position);
+                        }
+                    } else {
+                        let avoidance_radius_squared = boid_configuration
+                            .scalar_parametre("avoidance_radius")
+                            .squared();
+                        let distance_squared = distance.squared();
+                        let r = other_boid.position - position;
+                        if distance_squared < avoidance_radius_squared {
+                            push_force -= (boid_configuration
+                                .scalar_parametre("separation_weight")
+                                * avoidance_radius_squared
+                                * r.normalize_or(boid.velocity())
+                                / if distance_squared < 0.1 {
+                                    1.0
+                                } else {
+                                    distance_squared
+                                })
+                            .clamp_length_max(avoidance_radius_squared);
+                        }
                     }
                 }
             }
@@ -360,7 +360,11 @@ pub fn draw_debug(
 
     // Spatial grid
     for cell in spatial_grid.cells() {
-        gizmos.rect_2d(cell.location(), Vec2::splat(spatial_grid.cell_size()), WHITE);
+        gizmos.rect_2d(
+            cell.location(),
+            Vec2::splat(spatial_grid.cell_size()),
+            WHITE,
+        );
     }
     for cell in
         spatial_grid.iter_radius(position, boid_configuration.scalar_parametre("view_radius"))
