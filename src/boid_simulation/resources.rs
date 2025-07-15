@@ -491,8 +491,9 @@ impl<'g> SpatialGridInRadiusIter<'g> {
     pub fn new(spatial_grid: &'g SpatialGrid, centre: Vec2, radius: f32) -> Self {
         let inf = centre - radius;
         let sup = centre + radius;
-        let inf_index = (inf / spatial_grid.cell_size()).floor().as_uvec2();
-        let sup_index = (sup / spatial_grid.cell_size()).floor().as_uvec2();
+        let offset = spatial_grid.grid_size() / 2.0;
+        let inf_index = ((inf + offset) / spatial_grid.cell_size()).floor().as_uvec2();
+        let sup_index = ((sup + offset) / spatial_grid.cell_size()).floor().as_uvec2();
         let index_ranges = (inf_index.x..=sup_index.x, inf_index.y..=sup_index.y);
         Self {
             spatial_grid,
