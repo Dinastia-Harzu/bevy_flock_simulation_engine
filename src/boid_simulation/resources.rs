@@ -505,8 +505,6 @@ impl<'g> SpatialGridInRadiusIter<'g> {
         };
         let inf_index = reckon_indices_from(inf);
         let sup_index = reckon_indices_from(sup);
-        println!("inf: {inf} -> {inf_index}");
-        println!("sup: {sup} -> {sup_index}");
         let index_ranges = (inf_index.x..=sup_index.x, inf_index.y..=sup_index.y);
         Self {
             spatial_grid,
