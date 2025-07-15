@@ -109,3 +109,15 @@ impl WindCurrent {
         }
     }
 }
+
+#[derive(Component, Clone, Reflect)]
+#[reflect(Component)]
+pub struct ForceField {
+    pub charge: f32
+}
+
+impl ForceField {
+    pub fn new(charge: f32) -> Self {
+        Self { charge }
+    }
+}

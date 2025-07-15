@@ -97,6 +97,15 @@ pub fn setup_simulation(
         ));
     }
 
+    // Force fields
+    for _ in 0..1 {
+        commands.spawn((
+            Name::from("Force field"),
+            ForceField::new(100.0),
+            Transform::from_xyz(-500.0, 200.0, 0.0),
+        ));
+    }
+
     // Switch to next state
     app_next_state.set(SimulationState::Running);
 }
@@ -124,6 +133,7 @@ pub fn update_boids(
         (With<BoidPredator>, Without<BoidTestingUnit>),
     >,
     wind_currents: Query<&WindCurrent>,
+    force_fields: Query<(&Transform, &ForceField), (Without<Boid>)>,
     boid_configuration: Res<BoidConfiguration>,
     simulation_configuration: Res<SimulationConfiguration>,
     spatial_grid: Res<SpatialGrid>,
@@ -186,6 +196,10 @@ pub fn update_boids(
                             }
                         }
                     }
+                }
+                for (ff_point, ff) in force_fields {
+                    push_force += coulomb(ff_point.translation.xy(), position, ff.charge, 1.0);
+                    dbg!("Entra");
                 }
                 if neighbours_to_follow > 1 {
                     let neighbours_to_follow = neighbours_to_follow as f32;
@@ -327,6 +341,7 @@ pub fn wrap_edges(boids: Query<&mut Transform, With<Boid>>, spatial_grid: Res<Sp
 pub fn draw_debug(
     wind_currents: Query<&WindCurrent>,
     testing_unit_boid: Option<Single<(&Transform, &mut Sprite), With<BoidTestingUnit>>>,
+    force_fields: Query<(&Transform, &ForceField)>,
     spatial_grid: Res<SpatialGrid>,
     boid_configuration: Res<BoidConfiguration>,
     simulation_configuration: Res<SimulationConfiguration>,
@@ -388,6 +403,24 @@ pub fn draw_debug(
             .tuple_windows::<(_, _)>()
         {
             gizmos.arrow_2d(start, end, WHITE);
+        }
+    }
+
+    // Force fields
+    for (ff_point, ff) in force_fields {
+        let point = ff_point.translation.xy();
+        let colour = if ff.charge.is_sign_positive() {
+            RED
+        } else {
+            BLUE
+        };
+        gizmos.circle_2d(point, 10.0, colour);
+        // gizmos.circle_2d(point, ff.charge, colour);
+        let pieces = 8;
+        let angle_step = 360.0 / pieces as f32;
+        for i in 0..pieces {
+            let end = point + ff.charge * Vec2::from_angle(((i as f32) * angle_step).to_radians());
+            gizmos.arrow_2d(point, end, colour);
         }
     }
 }

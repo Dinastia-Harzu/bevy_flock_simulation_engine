@@ -99,6 +99,12 @@ impl DivAssign<f32> for OVec2 {
     }
 }
 
+pub fn coulomb(r1: Vec2, r2: Vec2, q1: f32, q2: f32) -> Vec2 {
+    let r = r2 - r1;
+    let u = r.normalize_or_zero();
+    u * q1 * q2 / r.length_squared()
+}
+
 ///////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////
 
