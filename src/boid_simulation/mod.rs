@@ -29,6 +29,6 @@ impl Plugin for BoidSimulationPlugin {
                 FixedUpdate,
                 (update_spatial_grid, update_boids, wrap_edges).chain(),
             )
-            .add_systems(PostUpdate, (update_debug_boid, draw_debug));
+            .add_systems(PostUpdate, draw_debug);
     }
 }

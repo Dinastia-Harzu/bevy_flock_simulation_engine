@@ -58,7 +58,7 @@ pub fn setup_simulation(
         BoidTestingUnit::default(),
     ));
 
-    // Predator(s)
+    // Predators
     for _ in 0..simulation_configuration.predators {
         let angle = rng.random_range(-pi..=pi);
         commands.spawn((
@@ -324,8 +324,10 @@ pub fn wrap_edges(boids: Query<&mut Transform, With<Boid>>, spatial_grid: Res<Sp
     }
 }
 
-pub fn update_debug_boid(
+pub fn draw_debug(
+    wind_currents: Query<&WindCurrent>,
     testing_unit_boid: Option<Single<(&Transform, &mut Sprite), With<BoidTestingUnit>>>,
+    spatial_grid: Res<SpatialGrid>,
     boid_configuration: Res<BoidConfiguration>,
     simulation_configuration: Res<SimulationConfiguration>,
     mut gizmos: Gizmos,
@@ -334,6 +336,7 @@ pub fn update_debug_boid(
         return;
     }
 
+    // Boid testing unit
     let Some(boid) = testing_unit_boid else {
         return;
     };
@@ -354,24 +357,20 @@ pub fn update_debug_boid(
             GREEN,
         )
         .resolution(64);
-}
 
-pub fn draw_debug(
-    wind_currents: Query<&WindCurrent>,
-    boid: Single<&Transform, With<BoidTestingUnit>>,
-    spatial_grid: Res<SpatialGrid>,
-    boid_configuration: Res<BoidConfiguration>,
-    simulation_configuration: Res<SimulationConfiguration>,
-    mut gizmos: Gizmos,
-) {
-    if !simulation_configuration.should_draw {
-        return;
-    }
-
-    let cell_size = spatial_grid.cell_size();
+    // Spatial grid
     for cell in spatial_grid.cells() {
-        gizmos.rect_2d(cell.location(), Vec2::splat(cell_size), WHITE);
+        gizmos.rect_2d(cell.location(), Vec2::splat(spatial_grid.cell_size()), WHITE);
     }
+    for cell in
+        spatial_grid.iter_radius(position, boid_configuration.scalar_parametre("view_radius"))
+    {
+        for r in 1..=4 {
+            gizmos.circle_2d(cell.location(), (r * 20) as f32, ORANGE);
+        }
+    }
+
+    // Wind currents
     for wind_current in wind_currents {
         let curve = wind_current.curve();
         for (i, &point) in wind_current.control_points().iter().enumerate() {
@@ -385,14 +384,6 @@ pub fn draw_debug(
             .tuple_windows::<(_, _)>()
         {
             gizmos.arrow_2d(start, end, WHITE);
-        }
-    }
-    let position = boid.into_inner().translation.xy();
-    for cell in
-        spatial_grid.iter_radius(position, boid_configuration.scalar_parametre("view_radius"))
-    {
-        for r in 1..=8 {
-            gizmos.circle_2d(cell.location(), (r * 10) as f32, ORANGE);
         }
     }
 }
