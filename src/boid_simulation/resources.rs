@@ -141,7 +141,7 @@ pub struct SimulationConfiguration {
 }
 
 impl SimulationConfiguration {
-    pub const BOIDS_RANGE: RangeInclusive<u32> = 0..=5000;
+    pub const BOIDS_RANGE: RangeInclusive<u32> = 0..=10000;
 
     fn new(
         should_draw: bool,
