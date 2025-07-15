@@ -81,19 +81,21 @@ pub fn setup_simulation(
     }
 
     // Wind currents
-    commands.spawn((
-        Name::from("Wind current"),
-        WindCurrent::new(
-            100.0,
-            100.0,
-            [
-                vec2(-10.0, -200.0),
-                vec2(30.0, 20.0),
-                vec2(350.0, 30.0),
-                vec2(390.0, 80.0),
-            ],
-        ),
-    ));
+    for _ in 0..1 {
+        commands.spawn((
+            Name::from("Wind current"),
+            WindCurrent::new(
+                100.0,
+                100.0,
+                [
+                    vec2(-10.0, -200.0),
+                    vec2(30.0, 20.0),
+                    vec2(350.0, 30.0),
+                    vec2(390.0, 80.0),
+                ],
+            ),
+        ));
+    }
 
     // Switch to next state
     app_next_state.set(SimulationState::Running);
