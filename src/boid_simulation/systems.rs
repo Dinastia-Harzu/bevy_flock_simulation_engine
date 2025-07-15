@@ -358,7 +358,9 @@ pub fn update_debug_boid(
 
 pub fn draw_debug(
     wind_currents: Query<&WindCurrent>,
+    boid: Single<&Transform, With<BoidTestingUnit>>,
     spatial_grid: Res<SpatialGrid>,
+    boid_configuration: Res<BoidConfiguration>,
     simulation_configuration: Res<SimulationConfiguration>,
     mut gizmos: Gizmos,
 ) {
@@ -368,7 +370,7 @@ pub fn draw_debug(
 
     let cell_size = spatial_grid.cell_size();
     for cell in spatial_grid.cells() {
-        gizmos.rect_2d(cell.location(), Vec2::new(cell_size, cell_size), WHITE);
+        gizmos.rect_2d(cell.location(), Vec2::splat(cell_size), WHITE);
     }
     for wind_current in wind_currents {
         let curve = wind_current.curve();
@@ -383,6 +385,14 @@ pub fn draw_debug(
             .tuple_windows::<(_, _)>()
         {
             gizmos.arrow_2d(start, end, WHITE);
+        }
+    }
+    let position = boid.into_inner().translation.xy();
+    for cell in
+        spatial_grid.iter_radius(position, boid_configuration.scalar_parametre("view_radius"))
+    {
+        for r in 1..=8 {
+            gizmos.circle_2d(cell.location(), (r * 10) as f32, ORANGE);
         }
     }
 }
