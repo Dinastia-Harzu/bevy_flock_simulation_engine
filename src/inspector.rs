@@ -28,7 +28,7 @@ pub fn inspector_ui(world: &mut World) {
     };
     let mut egui_context = egui_context.clone();
 
-    egui::Window::new("Boids Config").show(egui_context.get_mut(), |ui| {
+    egui::Window::new("Boids").show(egui_context.get_mut(), |ui| {
         egui::ScrollArea::vertical().show(ui, |ui| {
             let mut boid_config = world.resource_mut::<BoidConfiguration>();
             ui.heading("Configuración de los boids");
@@ -79,14 +79,16 @@ pub fn inspector_ui(world: &mut World) {
                     ui.drag_angle(&mut selected_boid.angle);
                 }
             }
+        });
+    });
 
+    egui::Window::new("Simulación").show(egui_context.get_mut(), |ui| {
+        egui::ScrollArea::vertical().show(ui, |ui| {
             let there_are_predators = !world
                 .query_filtered::<(), With<BoidPredator>>()
                 .query(world)
                 .is_empty();
             let mut simulation_config = world.resource_mut::<SimulationConfiguration>();
-            ui.separator();
-            ui.heading("Simulación");
             ui.add(
                 egui::Slider::new(
                     &mut simulation_config.normal_boids,
@@ -115,9 +117,15 @@ pub fn inspector_ui(world: &mut World) {
         });
     });
 
-    egui::Window::new("Boids").show(egui_context.get_mut(), |ui| {
+    egui::Window::new("Entidades").show(egui_context.get_mut(), |ui| {
         egui::ScrollArea::vertical().show(ui, |ui| {
             ui_for_world(world, ui);
+        });
+    });
+
+    egui::Window::new("Corrientes eólicas").show(egui_context.get_mut(), |ui| {
+        egui::ScrollArea::vertical().show(ui, |ui| {
+            ui_for_entities_filtered(world, ui, true, &Filter::<With<WindCurrent>>::all());
         });
     });
 }
