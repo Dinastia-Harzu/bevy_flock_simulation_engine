@@ -1,7 +1,7 @@
 use bevy::prelude::*;
 use std::{
     fmt::Debug,
-    ops::{Index, IndexMut},
+    ops::{AddAssign, DivAssign, Index, IndexMut},
 };
 
 use crate::boid_simulation::resources::SimulationConfiguration;
@@ -66,6 +66,36 @@ impl SpatialGridCell {
 impl Debug for SpatialGridCell {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         writeln!(f, "{} boids", self.boids.len())
+    }
+}
+
+///////////////////////////////////////////////////////
+///////////////////////////////////////////////////////
+
+#[derive(Debug, Clone, Copy, Default)]
+pub struct OVec2(Option<Vec2>);
+
+impl OVec2 {
+    pub fn new(v: Vec2) -> Self {
+        Self(Some(v))
+    }
+
+    pub fn get(&self) -> Option<Vec2> {
+        self.0
+    }
+}
+
+impl AddAssign<Vec2> for OVec2 {
+    fn add_assign(&mut self, rhs: Vec2) {
+        self.0 = Some(self.0.unwrap_or_default() + rhs);
+    }
+}
+
+impl DivAssign<f32> for OVec2 {
+    fn div_assign(&mut self, rhs: f32) {
+        if self.0.is_some() {
+            self.0 = Some(self.0.unwrap_or_default() / rhs);
+        }
     }
 }
 

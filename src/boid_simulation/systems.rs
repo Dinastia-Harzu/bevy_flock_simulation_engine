@@ -145,15 +145,15 @@ pub fn update_boids(
                 || testing_unit.is_some_and(|testing_unit| testing_unit.follow_boids)
             {
                 // Common
-                let mut perceived_centre = Vec2::ZERO;
-                let mut push_force = Vec2::ZERO;
-                let mut perceived_velocity = Vec2::ZERO;
+                let mut perceived_centre = OVec2::default();
+                let mut perceived_velocity = OVec2::default();
                 let mut neighbours_to_follow = 0;
+                let mut push_force = Vec2::ZERO;
                 let view_radius = boid_configuration.scalar_parametre("view_radius");
                 let view_radius_squared = view_radius.squared();
                 let avoidance_radius = boid_configuration.scalar_parametre("avoidance_radius");
                 let avoidance_radius_squared = avoidance_radius.squared();
-                let cell = spatial_grid.at_world_position(position);
+                // let cell = spatial_grid.at_world_position(position);
                 for cell in spatial_grid.iter_radius(position, view_radius) {
                     for other_boid in cell
                         .cell_boids()
@@ -165,19 +165,21 @@ pub fn update_boids(
                         if boid_predators.contains(other_boid.entity) {
                             if distance_squared < view_radius_squared {
                                 push_force -= boid_configuration.scalar_parametre("Flee weight")
-                                    * r.normalize()
+                                    * r.normalize_or_zero()
                                     * boid.speed;
                             }
                         } else {
                             if distance_squared < avoidance_radius_squared {
-                                push_force -= boid_configuration
+                                push_force -= (boid_configuration
                                     .scalar_parametre("separation_weight")
                                     * avoidance_radius_squared
-                                    * if distance_squared < 0.1 {
-                                        Vec2::Y
+                                    * r.normalize_or(boid.velocity())
+                                    / if distance_squared < 0.1 {
+                                        1.0
                                     } else {
-                                        r.normalize() / distance_squared
-                                    };
+                                        distance_squared
+                                    })
+                                .clamp_length_max(avoidance_radius_squared);
                             } else if distance_squared < view_radius_squared {
                                 perceived_centre += other_boid.position;
                                 perceived_velocity += other_boid.velocity;
@@ -193,14 +195,14 @@ pub fn update_boids(
                 }
 
                 // Cohesion
-                velocity += (perceived_centre - position)
+                velocity += (perceived_centre.get().unwrap_or(position) - position)
                     * boid_configuration.scalar_parametre("cohesion_weight");
 
                 // Separation
                 velocity += push_force;
 
                 // Alignment
-                velocity += (perceived_velocity - velocity)
+                velocity += (perceived_velocity.get().unwrap_or(velocity) - velocity)
                     * boid_configuration.scalar_parametre("alignment_weight");
 
                 // Strong wind
@@ -261,13 +263,15 @@ pub fn update_boids(
                     let distance_squared = distance.squared();
                     let r = other_boid.position - position;
                     if distance_squared < avoidance_radius_squared {
-                        push_force -= boid_configuration.scalar_parametre("separation_weight")
+                        push_force -= (boid_configuration.scalar_parametre("separation_weight")
                             * avoidance_radius_squared
-                            * if distance_squared < 0.1 {
-                                Vec2::Y
+                            * r.normalize_or(boid.velocity())
+                            / if distance_squared < 0.1 {
+                                1.0
                             } else {
-                                r.normalize() / distance_squared
-                            };
+                                distance_squared
+                            })
+                        .clamp_length_max(avoidance_radius_squared);
                     }
                 }
             }
