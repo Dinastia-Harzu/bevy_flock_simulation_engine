@@ -18,6 +18,7 @@ impl Plugin for BoidSimulationPlugin {
             .insert_resource(SpatialGrid::with_cell_size(200.0))
             .register_type::<Boid>()
             .register_type::<WindCurrent>()
+            .register_type::<ForceField>()
             .add_systems(Startup, setup_rules)
             .add_systems(
                 PreUpdate,

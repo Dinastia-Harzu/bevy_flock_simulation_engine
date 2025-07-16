@@ -7,7 +7,7 @@ use rand::Rng;
 
 pub fn clear_simulation(
     mut commands: Commands,
-    simulation_entities: Query<Entity, Or<(With<Boid>, With<WindCurrent>)>>,
+    simulation_entities: Query<Entity, Or<(With<Boid>, With<WindCurrent>, With<ForceField>)>>,
 ) {
     for entity in simulation_entities {
         commands.entity(entity).despawn();
@@ -101,8 +101,18 @@ pub fn setup_simulation(
     for _ in 0..1 {
         commands.spawn((
             Name::from("Force field"),
-            ForceField::new(100.0),
-            Transform::from_xyz(-500.0, 200.0, 0.0),
+            ForceField::new(120.0),
+            Transform::from_xyz(-550.0, 200.0, 0.0),
+        ));
+        commands.spawn((
+            Name::from("Force field"),
+            ForceField::new(80.0),
+            Transform::from_xyz(-400.0, 220.0, 0.0),
+        ));
+        commands.spawn((
+            Name::from("Force field"),
+            ForceField::new(-120.0),
+            Transform::from_xyz(550.0, -200.0, 0.0),
         ));
     }
 
@@ -197,14 +207,25 @@ pub fn update_boids(
                         }
                     }
                 }
-                for (ff_point, ff) in force_fields {
-                    push_force += coulomb(ff_point.translation.xy(), position, ff.charge, 1.0);
-                    dbg!("Entra");
-                }
                 if neighbours_to_follow > 1 {
                     let neighbours_to_follow = neighbours_to_follow as f32;
                     perceived_centre /= neighbours_to_follow;
                     perceived_velocity /= neighbours_to_follow;
+                }
+
+                // Force fields
+                for (ff_point, ff) in force_fields {
+                    let point = ff_point.translation.xy();
+                    let distance = point.distance(position);
+                    let charge = ff.charge.abs();
+                    push_force += if distance <= charge {
+                        ff.charge.signum()
+                            * (position - point).normalize_or(boid.velocity().normalize())
+                            * boid.speed
+                            * (1.0 - (1.0 - (distance / charge - 1.0).squared()).sqrt())
+                    } else {
+                        Vec2::ZERO
+                    };
                 }
 
                 // Cohesion
@@ -407,20 +428,20 @@ pub fn draw_debug(
     }
 
     // Force fields
-    for (ff_point, ff) in force_fields {
-        let point = ff_point.translation.xy();
-        let colour = if ff.charge.is_sign_positive() {
-            RED
-        } else {
-            BLUE
-        };
-        gizmos.circle_2d(point, 10.0, colour);
-        // gizmos.circle_2d(point, ff.charge, colour);
-        let pieces = 8;
+    {
+        let pieces = 12;
         let angle_step = 360.0 / pieces as f32;
-        for i in 0..pieces {
-            let end = point + ff.charge * Vec2::from_angle(((i as f32) * angle_step).to_radians());
-            gizmos.arrow_2d(point, end, colour);
+        for (ff_point, ff) in force_fields {
+            let point = ff_point.translation.xy();
+            for i in 0..pieces {
+                let end =
+                    point + ff.charge * Vec2::from_angle(((i as f32) * angle_step).to_radians());
+                if ff.charge.is_sign_positive() {
+                    gizmos.arrow_2d(point, end, RED);
+                } else {
+                    gizmos.arrow_2d(end, point, BLUE);
+                }
+            }
         }
     }
 }

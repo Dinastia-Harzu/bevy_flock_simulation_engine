@@ -128,4 +128,10 @@ pub fn inspector_ui(world: &mut World) {
             ui_for_entities_filtered(world, ui, true, &Filter::<With<WindCurrent>>::all());
         });
     });
+
+    egui::Window::new("Campos de fuerza").show(egui_context.get_mut(), |ui| {
+        egui::ScrollArea::vertical().show(ui, |ui| {
+            ui_for_entities_filtered(world, ui, true, &Filter::<With<ForceField>>::all());
+        });
+    });
 }
