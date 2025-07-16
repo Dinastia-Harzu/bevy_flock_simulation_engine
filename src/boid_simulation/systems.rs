@@ -310,6 +310,20 @@ pub fn update_boids(
                     }
                 }
             }
+            // Force fields
+            for (ff_point, ff) in force_fields {
+                let point = ff_point.translation.xy();
+                let distance = point.distance(position);
+                let charge = ff.charge.abs();
+                push_force += if distance <= charge {
+                    ff.charge.signum()
+                        * (position - point).normalize_or(boid.velocity().normalize())
+                        * boid.speed
+                        * (1.0 - (1.0 - (distance / charge - 1.0).squared()).sqrt())
+                } else {
+                    Vec2::ZERO
+                };
+            }
 
             // Separation
             velocity += push_force;
