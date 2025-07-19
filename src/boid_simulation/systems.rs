@@ -1,8 +1,4 @@
-use super::{
-    bundles::{BoidBundle, ForceFieldBundle, WindCurrentBundle},
-    components::*,
-    resources::*,
-};
+use super::{bundles::*, components::*, resources::*};
 use crate::{asset_related::resources::*, helpers::*, states::*};
 use bevy::{color::palettes::css::*, math::FloatPow, prelude::*};
 use core::f32;

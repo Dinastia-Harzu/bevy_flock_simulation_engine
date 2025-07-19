@@ -1,4 +1,4 @@
-use super::components::{Boid, ForceField, WindCurrent};
+use super::components::*;
 use bevy::prelude::*;
 
 #[derive(Bundle, Default)]
@@ -15,7 +15,7 @@ impl BoidBundle {
     }
 }
 
-struct BoidBundleBuilder(BoidBundle);
+pub struct BoidBundleBuilder(BoidBundle);
 
 impl BoidBundleBuilder {
     pub fn build(self) -> BoidBundle {
@@ -24,10 +24,12 @@ impl BoidBundleBuilder {
 
     pub fn name(mut self, name: &str) -> Self {
         self.0.name = Name::from(name);
+        self
     }
 
     pub fn boid(mut self, speed: f32, angle: f32) -> Self {
         self.0.boid = Boid::new(speed, angle);
+        self
     }
 
     pub fn sprite(mut self, image: Handle<Image>, colour: Color) -> Self {
@@ -36,12 +38,14 @@ impl BoidBundleBuilder {
             color: colour,
             ..default()
         };
+        self
     }
 
     pub fn transform(mut self, angle: f32, position: Vec2) -> Self {
         self.0.transform = Transform::from_scale(Vec3::ONE)
             .with_rotation(Quat::from_axis_angle(Vec3::Z, angle))
             .with_translation(position.extend(0.0));
+        self
     }
 }
 

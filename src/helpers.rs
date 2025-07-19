@@ -1,10 +1,9 @@
+use crate::boid_simulation::resources::*;
 use bevy::prelude::*;
 use std::{
     fmt::Debug,
     ops::{AddAssign, DivAssign, Range, RangeInclusive},
 };
-
-use crate::boid_simulation::resources::SimulationConfiguration;
 
 #[derive(Reflect)]
 pub struct SpatialGridBoid {

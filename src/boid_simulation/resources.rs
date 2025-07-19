@@ -1,4 +1,4 @@
-use crate::{constants::SCREEN_SIZE, helpers::*};
+use crate::{constants::*, helpers::*};
 use bevy::prelude::*;
 use bevy_inspector_egui::prelude::*;
 use core::panic;
@@ -46,11 +46,17 @@ impl BoidConfiguration {
     }
 
     pub fn scalar_parametre(&self, name: &str) -> f32 {
-        *self.get_scalar_parametre(name).expect(&format!("No existe el parámetro '{name}'")).0
+        *self
+            .get_scalar_parametre(name)
+            .expect(&format!("No existe el parámetro '{name}'"))
+            .0
     }
 
     pub fn scalar_parametre_mut(&mut self, name: &str) -> &mut f32 {
-        &mut *self.get_scalar_parametre_mut(name).expect(&format!("No existe el parámetro '{name}'")).0
+        &mut *self
+            .get_scalar_parametre_mut(name)
+            .expect(&format!("No existe el parámetro '{name}'"))
+            .0
     }
 
     pub fn lower_scalar_constant(&self, name: &str) -> f32 {
