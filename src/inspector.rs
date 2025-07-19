@@ -6,6 +6,7 @@ use bevy::prelude::*;
 use bevy_egui::*;
 use bevy_inspector_egui::{bevy_inspector::*, DefaultInspectorConfigPlugin};
 
+#[derive(Default)]
 pub struct InspectorPlugin;
 
 impl Plugin for InspectorPlugin {

@@ -1,10 +1,8 @@
-use super::resources::*;
 use crate::states::*;
 use bevy::prelude::*;
 
-pub(super) fn use_asset_handles(
+pub(super) fn start_running(
     mut _commands: Commands,
-    _image_assets: Res<ImageAssets>,
     mut app_next_state: ResMut<NextState<AppState>>,
 ) {
     app_next_state.set(AppState::Running);

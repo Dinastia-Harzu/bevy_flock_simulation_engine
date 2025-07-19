@@ -13,16 +13,6 @@ impl Boid {
         Self { speed, angle }
     }
 
-    pub fn with_speed(mut self, speed: f32) -> Self {
-        self.speed = speed;
-        self
-    }
-
-    pub fn with_angle(mut self, angle: f32) -> Self {
-        self.angle = angle;
-        self
-    }
-
     pub fn velocity(&self) -> Vec2 {
         Vec2::from_angle(self.angle) * self.speed
     }

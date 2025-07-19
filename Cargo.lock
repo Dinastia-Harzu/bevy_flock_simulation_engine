@@ -790,6 +790,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "bevy_flock_simulation_engine"
+version = "0.1.0"
+dependencies = [
+ "bevy",
+ "bevy-inspector-egui",
+ "bevy_asset_loader",
+ "bevy_egui",
+ "itertools 0.14.0",
+ "rand 0.9.1",
+]
+
+[[package]]
 name = "bevy_gilrs"
 version = "0.16.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3334,18 +3346,6 @@ checksum = "3be647b768db090acb35d5ec5db2b0e1f1de11133ca123b9eacf5137868f892a"
 dependencies = [
  "adler2",
  "simd-adler32",
-]
-
-[[package]]
-name = "motor-fisicas"
-version = "0.1.0"
-dependencies = [
- "bevy",
- "bevy-inspector-egui",
- "bevy_asset_loader",
- "bevy_egui",
- "itertools 0.14.0",
- "rand 0.9.1",
 ]
 
 [[package]]

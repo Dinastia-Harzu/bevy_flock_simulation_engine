@@ -1,8 +1,12 @@
 [package]
-name = "motor-fisicas"
+name = "bevy_flock_simulation_engine"
 authors = ["Arturo García Richardson", "Arturo García Richardson <agrg11@alu.ua.es>"]
 version = "0.1.0"
 edition = "2021"
+
+[lib]
+name = "bevy_flock_simulation_engine"
+path = "src/lib.rs"
 
 [dependencies]
 bevy = "0.16.0"

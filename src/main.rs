@@ -1,14 +1,5 @@
-mod asset_related;
-mod boid_simulation;
-mod constants;
-mod helpers;
-mod inspector;
-mod states;
-mod systems;
-
-use self::{boid_simulation::*, constants::*, inspector::*, states::*, systems::*};
-use asset_related::*;
 use bevy::prelude::*;
+use bevy_flock_simulation_engine::{constants::*, BevyFlockSimulationEnginePlugins};
 
 fn main() {
     App::new()
@@ -21,14 +12,6 @@ fn main() {
             }),
             ..Default::default()
         }))
-        .add_plugins(InspectorPlugin)
-        .add_plugins(AssetsPlugin)
-        .add_plugins(BoidSimulationPlugin)
-        .init_state::<AppState>()
-        .insert_resource(ClearColor(Color::srgba(0.0, 0.0, 0.0, 1.0)))
-        .insert_resource(Time::<Fixed>::from_hz(60.0))
-        .add_systems(Startup, setup)
-        .add_systems(Update, common_input)
-        .add_systems(OnEnter(AppState::Finished), exit)
+        .add_plugins(BevyFlockSimulationEnginePlugins)
         .run();
 }

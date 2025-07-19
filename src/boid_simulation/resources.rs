@@ -2,7 +2,6 @@ use crate::{constants::*, helpers::*};
 use bevy::prelude::*;
 use bevy_inspector_egui::prelude::*;
 use core::panic;
-use itertools::Itertools;
 use std::{collections::HashMap, fmt::Debug, ops::RangeInclusive};
 
 #[derive(Resource, Reflect, InspectorOptions)]

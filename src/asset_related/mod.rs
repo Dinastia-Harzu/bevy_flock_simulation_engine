@@ -6,6 +6,7 @@ use crate::states::*;
 use bevy::prelude::*;
 use bevy_asset_loader::prelude::*;
 
+#[derive(Default)]
 pub struct AssetsPlugin;
 
 impl Plugin for AssetsPlugin {
@@ -16,6 +17,6 @@ impl Plugin for AssetsPlugin {
                 .with_dynamic_assets_file::<StandardDynamicAssetCollection>("assets.ron")
                 .load_collection::<ImageAssets>(),
         )
-        .add_systems(Update, use_asset_handles.run_if(in_state(AppState::Next)));
+        .add_systems(Update, start_running.run_if(in_state(AppState::Next)));
     }
 }

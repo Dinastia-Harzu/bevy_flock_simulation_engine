@@ -41,10 +41,8 @@ pub fn setup_simulation(
     let mut rng = rand::rng();
     let pi = f32::consts::PI;
     let bounds = spatial_grid.grid_size() / 2.0;
-    let scale = Vec3::ONE;
     for _ in 0..simulation_configuration.normal_boids {
         let angle = rng.random_range(-pi..=pi);
-        let boid = Boid::new(boid_configuration.average_speed(), angle);
         commands.spawn(
             BoidBundle::start()
                 .name("Boid")
@@ -236,7 +234,7 @@ pub fn update_boids(
 
                 // Wind currents
                 for wind_current in wind_currents {
-                    if let Some((t, distance, _)) = wind_current.closest(position) {
+                    if let Some((t, _, _)) = wind_current.closest(position) {
                         let curve = wind_current.curve();
                         offset_velocity +=
                             curve.velocity(t).normalize_or_zero() * wind_current.wind_speed;
@@ -336,7 +334,7 @@ pub fn update_boids(
 
             // Wind currents
             for wind_current in wind_currents {
-                if let Some((t, distance, _)) = wind_current.closest(position) {
+                if let Some((t, _, _)) = wind_current.closest(position) {
                     let curve = wind_current.curve();
                     offset_velocity +=
                         curve.velocity(t).normalize_or_zero() * wind_current.wind_speed;

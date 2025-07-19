@@ -7,6 +7,7 @@ use self::{components::*, resources::*, systems::*};
 use crate::states::*;
 use bevy::prelude::*;
 
+#[derive(Default)]
 pub struct BoidSimulationPlugin;
 
 impl Plugin for BoidSimulationPlugin {
