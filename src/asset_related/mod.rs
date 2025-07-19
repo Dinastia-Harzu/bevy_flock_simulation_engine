@@ -1,4 +1,3 @@
-pub(crate) mod assets;
 pub(crate) mod resources;
 pub(crate) mod systems;
 

@@ -46,11 +46,11 @@ impl BoidConfiguration {
     }
 
     pub fn scalar_parametre(&self, name: &str) -> f32 {
-        *self.get_scalar_parametre(name).expect("No existe ningún parámetro con este nombre. Asegúrate de que lo has escrito bien o de que realmente has añadido este parámetro").0
+        *self.get_scalar_parametre(name).expect(&format!("No existe el parámetro '{name}'")).0
     }
 
     pub fn scalar_parametre_mut(&mut self, name: &str) -> &mut f32 {
-        &mut *self.get_scalar_parametre_mut(name).expect("No existe ningún parámetro con este nombre. Asegúrate de que lo has escrito bien o de que realmente has añadido este parámetro").0
+        &mut *self.get_scalar_parametre_mut(name).expect(&format!("No existe el parámetro '{name}'")).0
     }
 
     pub fn lower_scalar_constant(&self, name: &str) -> f32 {
@@ -204,116 +204,6 @@ impl<'a> IntoIterator for &'a BoidRules {
         self.0.iter()
     }
 }
-
-///////////////////////////////////////////////////////
-///////////////////////////////////////////////////////
-
-#[derive(Resource, Debug)]
-pub struct UniformGrid {
-    rect: CoordMapping,
-    cell_size: f32,
-    data: Vec<(usize, Entity, Vec2, Vec2)>,
-    grid: Grid<usize>,
-}
-
-impl UniformGrid {
-    pub fn new(origin: Vec2, cell_size: f32, rows: u32, columns: u32) -> Self {
-        let grid_size = UVec2::new(columns, rows);
-        Self {
-            rect: CoordMapping::new(
-                Rect::from_center_size(origin, grid_size.as_vec2() * cell_size),
-                grid_size,
-            ),
-            cell_size,
-            data: Vec::new(),
-            grid: Grid::new(grid_size, usize::MAX),
-        }
-    }
-
-    pub fn cell_size(&self) -> f32 {
-        self.cell_size
-    }
-
-    pub fn mapped_point(&self, point: Vec2) -> Vec2 {
-        self.rect.map_point(point)
-    }
-
-    pub fn contains_cell(&self, cell: UVec2) -> bool {
-        cell.cmplt(self.rect.dest).all()
-    }
-
-    pub fn size(&self) -> UVec2 {
-        self.grid.size
-    }
-
-    pub fn full_size(&self) -> Vec2 {
-        self.rect.src.size()
-    }
-
-    pub fn half_size(&self) -> Vec2 {
-        self.rect.src.half_size()
-    }
-
-    pub fn cell_data(
-        &self,
-        point: Vec2,
-    ) -> Option<impl Iterator<Item = (&'_ Entity, &'_ Vec2, &'_ Vec2)>> {
-        let index = self.spatial_index(point);
-        let start_index = self.grid[index];
-        if start_index == usize::MAX {
-            None
-        } else {
-            Some(self.data[start_index..].iter().filter_map(
-                move |(i, entity, position, velocity)| {
-                    if *i == index {
-                        Some((entity, position, velocity))
-                    } else {
-                        None
-                    }
-                },
-            ))
-        }
-    }
-
-    pub fn update(&mut self, src: impl ExactSizeIterator<Item = (Entity, Vec2, Vec2)>) {
-        self.data = src
-            .map(|(entity, position, velocity)| {
-                (self.spatial_index(position), entity, position, velocity)
-            })
-            .collect();
-        self.data.sort_unstable_by_key(|e| e.0);
-        self.data
-            .iter()
-            .map(|i| i.0)
-            .enumerate()
-            .dedup_by(|(_, i), (_, j)| i == j)
-            .for_each(|(group_index, spatial_index)| {
-                self.grid[spatial_index] = group_index;
-            });
-    }
-
-    fn width(&self) -> u32 {
-        self.rect.dest.x
-    }
-
-    fn scale(&self) -> IVec2 {
-        self.rect.scale.floor().as_ivec2()
-    }
-
-    fn offset(&self) -> IVec2 {
-        self.rect.offset.floor().as_ivec2()
-    }
-
-    fn spatial_index(&self, point: Vec2) -> usize {
-        let UVec2 { x: column, y: row } = ((point.as_ivec2() * self.scale()) + self.offset())
-            .as_uvec2()
-            .min(self.size() - 1);
-        (row * self.width() + column) as usize
-    }
-}
-
-///////////////////////////////////////////////////////
-///////////////////////////////////////////////////////
 
 #[derive(Resource, Reflect, InspectorOptions)]
 #[reflect(Resource, InspectorOptions)]

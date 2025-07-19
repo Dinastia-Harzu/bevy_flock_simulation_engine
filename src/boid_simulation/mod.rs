@@ -1,9 +1,9 @@
+pub(crate) mod bundles;
 pub(crate) mod components;
 pub(crate) mod resources;
-pub(crate) mod rules;
 pub(crate) mod systems;
 
-use self::{components::*, resources::*, rules::*, systems::*};
+use self::{components::*, resources::*, systems::*};
 use crate::states::*;
 use bevy::prelude::*;
 
@@ -19,7 +19,7 @@ impl Plugin for BoidSimulationPlugin {
             .register_type::<Boid>()
             .register_type::<WindCurrent>()
             .register_type::<ForceField>()
-            .add_systems(Startup, setup_rules)
+            .add_systems(Startup, setup_boid_parametres)
             .add_systems(
                 PreUpdate,
                 (clear_simulation, setup_simulation)

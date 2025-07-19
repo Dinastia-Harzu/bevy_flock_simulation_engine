@@ -1,7 +1,5 @@
-use std::usize;
-
 use super::resources::*;
-use bevy::{math::FloatPow, prelude::*};
+use bevy::prelude::*;
 
 #[derive(Component, Clone, Copy, Default, Reflect)]
 #[reflect(Component)]
@@ -113,7 +111,7 @@ impl WindCurrent {
 #[derive(Component, Clone, Reflect)]
 #[reflect(Component)]
 pub struct ForceField {
-    pub charge: f32
+    pub charge: f32,
 }
 
 impl ForceField {

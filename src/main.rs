@@ -1,11 +1,8 @@
 mod asset_related;
 mod boid_simulation;
-mod components;
 mod constants;
 mod helpers;
 mod inspector;
-mod miscellaneous;
-mod resources;
 mod states;
 mod systems;
 
