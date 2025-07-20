@@ -1,0 +1,5 @@
+({
+    "image.boid": Image (
+        path: "boid.png",
+    )
+})
