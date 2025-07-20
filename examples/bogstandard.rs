@@ -5,7 +5,7 @@ fn main() {
     App::new()
         .add_plugins(DefaultPlugins.set(WindowPlugin {
             primary_window: Some(Window {
-                title: "Motor de físicas en Rust".into(),
+                title: "Motor de físicas para simulación de boids".into(),
                 position: WindowPosition::Centered(MonitorSelection::Primary),
                 resolution: SCREEN_SIZE.into(),
                 ..Default::default()
