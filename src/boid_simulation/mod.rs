@@ -1,7 +1,7 @@
-pub(crate) mod bundles;
-pub(crate) mod components;
-pub(crate) mod resources;
-pub(crate) mod systems;
+pub mod bundles;
+pub mod components;
+pub mod resources;
+pub mod systems;
 
 use self::{components::*, resources::*, systems::*};
 use crate::states::*;
