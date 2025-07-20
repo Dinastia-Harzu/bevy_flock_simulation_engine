@@ -8,9 +8,9 @@ fn main() {
                 title: "Motor de físicas para simulación de boids".into(),
                 position: WindowPosition::Centered(MonitorSelection::Primary),
                 resolution: SCREEN_SIZE.into(),
-                ..Default::default()
+                ..default()
             }),
-            ..Default::default()
+            ..default()
         }))
         .add_plugins(BevyFlockSimulationEnginePlugins)
         .run();
